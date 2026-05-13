@@ -8,8 +8,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn("Supabase credentials missing. Check your .env file.");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
+//export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co', // 占位符防止构建崩溃
+  supabaseAnonKey || 'placeholder'
+);
 /**
  * 为服务端渲染（SSR）创建一个请求相关的 Supabase 客户端。
  * 它通过对接 Astro 的 cookies 对象，使服务器能识别用户的登录状态。

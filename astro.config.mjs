@@ -4,7 +4,8 @@ import tailwind from '@astrojs/tailwind';
 
 // https://astro.build/config
 export default defineConfig({
-  adapter: cloudflare({
+  output: 'server',
+    adapter: cloudflare({
     imageService: 'compile',
     platformProxy: {
       enabled: true,
