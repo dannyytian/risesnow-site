@@ -1,0 +1,316 @@
+---
+import MainLayout from '../layouts/MainLayout.astro';
+import { getSupabaseClient } from '../lib/supabase';
+
+const supabase = getSupabaseClient(Astro.cookies);
+const { data: { user } } = await supabase.auth.getUser();
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+export interface Profile {
+  user_id: string;
+  full_name: string | null;
+  phone: string | null;
+  gender: string | null;
+  birth_year: number | null;
+  skill_level: string | null;
+  bio: string | null;
+}
+
+// 从 profiles 表获取详细信息
+let { data: profileData, error: profileError } = await supabase
+  .from('profiles')
+  .select('*')
+  .eq('user_id', user.id)
+  .single();
+
+let profile = profileData as unknown as Profile | null;
+
+// 如果没有找到 profile 记录 (PGRST116)，则自动创建一条初始记录
+if (!profile || (profileError && profileError.code === 'PGRST116')) {
+  const { data: newProfile, error: createError } = await supabase
+    .from('profiles')
+    .upsert({
+      user_id: user.id,
+      full_name: user.user_metadata?.full_name || '',
+    }, { onConflict: 'user_id' })
+    .select()
+    .single();
+
+  if (!createError) profile = newProfile as unknown as Profile;
+}
+
+interface RegistrationWithActivity {
+  id: string;
+  status: string;
+  activities: {
+    title: string;
+    date: string;
+    location: string;
+  } | null;
+}
+
+// 获取该用户已报名的活动列表及活动详情
+const { data: registrationsData } = await supabase
+  .from('registrations')
+  .select(`
+    id,
+    status,
+    activities (
+      title,
+      date,
+      location
+    )
+  `)
+  .eq('user_id', user.id)
+  .order('created_at', { ascending: false });
+
+const myRegistrations = registrationsData as unknown as RegistrationWithActivity[] | null;
+
+// 生成年份列表，从当前年份倒序到 1940
+const currentYear = new Date().getFullYear();
+const birthYears = Array.from({ length: currentYear - 1940 + 1 }, (_, i) => currentYear - i);
+---
+
+<MainLayout title="Profile Settings - RiseSnow Club">
+  <main class="min-h-screen pt-32 px-8 flex justify-center bg-snow-white font-sans">
+    <div class="w-full max-w-md">
+      <h2 class="font-serif text-3xl uppercase tracking-widest text-brand-black mb-8 border-b border-platinum pb-4">Profile Settings</h2>
+      
+      <form id="profile-form" class="space-y-6">
+        <div>
+          <label class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black/60 mb-2">Email (Static)</label>
+          <input type="text" value={user.email} disabled class="w-full px-4 py-3 bg-platinum/30 border border-platinum text-brand-black/50 rounded-md cursor-not-allowed" />
+        </div>
+        
+        <div>
+          <label for="full_name" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Full Name / 全名</label>
+          <input
+            type="text"
+            id="full_name"
+            name="full_name"
+            value={profile?.full_name || ''}
+            class="w-full px-4 py-3 border border-platinum focus:border-gold-accent focus:ring-0 transition-colors bg-snow-white text-brand-black outline-none"
+            placeholder="Enter your name"
+          />
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="phone" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Phone / 手机号</label>
+            <input
+              type="tel"
+              id="phone"
+              name="phone"
+              value={profile?.phone || ''}
+              class="w-full px-4 py-3 border border-platinum focus:border-gold-accent outline-none bg-snow-white transition-colors"
+            />
+          </div>
+          <div>
+            <label for="gender" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Gender / 性别</label>
+            <select id="gender" name="gender" class="w-full px-4 py-3 border border-platinum focus:border-gold-accent outline-none bg-snow-white transition-colors">
+              <option value="">Select</option>
+              <option value="Male" selected={profile?.gender === 'Male'}>Male</option>
+              <option value="Female" selected={profile?.gender === 'Female'}>Female</option>
+              <option value="Other" selected={profile?.gender === 'Other'}>Other</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="birth_year" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Birth Year / 出生年</label>
+            <select
+              id="birth_year"
+              name="birth_year"
+              class="w-full px-4 py-3 border border-platinum focus:border-gold-accent outline-none bg-snow-white transition-colors"
+            >
+              <option value="">Select Year</option>
+              {birthYears.map((year) => (
+                <option 
+                  value={year} 
+                  selected={profile?.birth_year ? profile.birth_year === year : year === 2000}
+                >
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label for="skill_level" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Skill / 滑行等级</label>
+            <select id="skill_level" name="skill_level" class="w-full px-4 py-3 border border-platinum focus:border-gold-accent outline-none bg-snow-white transition-colors">
+              <option value="Beginner" selected={profile?.skill_level === 'Beginner'}>Beginner (初学者)</option>
+              <option value="Intermediate" selected={profile?.skill_level === 'Intermediate'}>Intermediate (中级)</option>
+              <option value="Advanced" selected={profile?.skill_level === 'Advanced'}>Advanced (高级)</option>
+              <option value="Expert" selected={profile?.skill_level === 'Expert'}>Expert (专家)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label for="bio" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Bio / 个人简介</label>
+          <textarea
+            id="bio"
+            name="bio"
+            rows="4"
+            class="w-full px-4 py-3 border border-platinum focus:border-gold-accent outline-none bg-snow-white transition-colors resize-y"
+            placeholder="Tell us a bit about yourself and your skiing passion..."
+          >{profile?.bio || ''}</textarea>
+        </div>
+
+        <button type="submit" id="update-button" class="w-full bg-brand-black text-snow-white font-bold uppercase tracking-[0.2em] py-4 hover:bg-gold-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          Update Profile
+        </button>
+      </form>
+
+      <!-- 已报名活动列表 -->
+      <div class="mt-20">
+        <h2 class="font-serif text-3xl uppercase tracking-widest text-brand-black mb-8 border-b border-platinum pb-4">My Activities / 我的报名</h2>
+        <div class="space-y-4">
+          {myRegistrations && myRegistrations.length > 0 ? (
+            myRegistrations.map((reg) => (
+              <div class="bg-white border border-platinum p-6 rounded-lg shadow-sm flex justify-between items-center group hover:border-brand-blue transition-colors duration-300">
+                <div>
+                  <h3 class="font-serif text-xl text-brand-blue uppercase tracking-tight group-hover:text-brand-blue transition-colors">{reg.activities?.title || '未知活动 / Activity Removed'}</h3>
+                  <p class="text-sm text-brand-blue/60 mt-1">{reg.activities?.date || 'N/A'} · {reg.activities?.location || 'N/A'}</p>
+                </div>
+                <div class="text-right flex items-center space-x-6">
+                  <span class={`text-[10px] uppercase tracking-widest px-4 py-1.5 rounded-full font-bold shadow-sm ${
+                    reg.status === 'confirmed' ? 'bg-green-100 text-green-700' : 'bg-accent-yellow/20 text-brand-blue'
+                  }`}>
+                    {reg.status === 'pending' ? 'Pending / 审核中' : reg.status}
+                  </span>
+                  <button
+                    class="cancel-reg-btn text-[10px] uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors font-bold cursor-pointer"
+                    data-id={reg.id}
+                  >
+                    Cancel / 取消
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p class="text-brand-blue/60 italic text-sm">You haven't registered for any activities yet. / 暂无报名记录。</p>
+          )}
+        </div>
+      </div>
+
+      <!-- Toast 提示容器 -->
+      <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-full bg-brand-blue/90 backdrop-blur-md text-white text-sm font-medium shadow-2xl transition-all duration-500 opacity-0 pointer-events-none translate-y-10 flex items-center space-x-2">
+        <svg id="toast-icon-success" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-400 hidden" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+        </svg>
+        <svg id="toast-icon-error" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-200 hidden" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+        </svg>
+        <span id="toast-message"></span>
+      </div>
+    </div>
+  </main>
+</MainLayout>
+
+<script>
+  import { supabase } from '../lib/supabase';
+
+  const form = document.getElementById('profile-form') as HTMLFormElement;
+  const updateBtn = document.getElementById('update-button') as HTMLButtonElement;
+  const toast = document.getElementById('toast');
+  const toastMessage = document.getElementById('toast-message');
+  const iconSuccess = document.getElementById('toast-icon-success');
+  const iconError = document.getElementById('toast-icon-error');
+
+  function showToast(message: string, isError = false) {
+    if (!toast || !toastMessage || !iconSuccess || !iconError) return;
+    
+    toastMessage.textContent = message;
+    
+    // 根据状态切换背景颜色和图标
+    toast.classList.toggle('bg-red-600/90', isError);
+    toast.classList.toggle('bg-red-500/90', false); // 清除旧的颜色类
+    toast.classList.toggle('bg-brand-blue/90', !isError);
+    iconSuccess.classList.toggle('hidden', isError);
+    iconError.classList.toggle('hidden', !isError);
+
+    // 进场动画
+    toast.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
+    toast.classList.add('opacity-100', 'translate-y-0');
+
+    // 3秒后自动消失（如果页面没刷新）
+    setTimeout(() => {
+      toast.classList.remove('opacity-100', 'translate-y-0');
+      toast.classList.add('opacity-0', 'translate-y-10', 'pointer-events-none');
+    }, 3000);
+  }
+  
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    if (updateBtn) {
+      updateBtn.disabled = true;
+      updateBtn.textContent = 'Saving... / 保存中...';
+    }
+    
+    const formData = new FormData(form);
+
+    // 定义内部接口以确保更新对象的类型安全
+    interface ProfileUpdate extends Omit<Profile, 'user_id'> {
+      user_id?: string;
+    }
+
+    const birthYearValue = formData.get('birth_year');
+    
+    const updates: Profile = {
+      user_id: (await supabase.auth.getUser()).data.user?.id as string,
+      full_name: (formData.get('full_name') as string) || null,
+      phone: (formData.get('phone') as string) || null,
+      gender: (formData.get('gender') as string) || null,
+      birth_year: birthYearValue ? parseInt(birthYearValue as string) : null,
+      skill_level: (formData.get('skill_level') as string) || null,
+      bio: (formData.get('bio') as string) || null,
+    };
+
+    const { error } = await supabase.from('profiles').upsert(updates, { onConflict: 'user_id' });
+
+    if (error) {
+      showToast(error.message, true);
+      if (updateBtn) {
+        updateBtn.disabled = false;
+        updateBtn.textContent = 'Update Profile';
+      }
+    } else {
+      showToast('Profile updated successfully! / 个人资料更新成功！');
+      // 延迟刷新，让用户看一眼 Toast
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    }
+  });
+
+  // 处理取消报名逻辑
+  const cancelButtons = document.querySelectorAll('.cancel-reg-btn');
+  cancelButtons.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const regId = btn.getAttribute('data-id');
+      if (!regId) return;
+
+      const confirmed = confirm('Are you sure you want to cancel this registration? / 确定要取消这项报名吗？');
+      if (confirmed) {
+        const { error } = await supabase
+          .from('registrations')
+          .delete()
+          .eq('id', regId);
+
+        if (error) {
+          showToast('Failed to cancel / 取消失败: ' + error.message, true);
+        } else {
+          showToast('Registration cancelled. / 报名已取消。');
+          setTimeout(() => {
+            window.location.reload();
+          }, 800);
+        }
+      }
+    });
+  });
+</script>

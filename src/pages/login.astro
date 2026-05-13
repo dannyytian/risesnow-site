@@ -1,0 +1,93 @@
+---
+import MainLayout from '../layouts/MainLayout.astro';
+import { supabase } from '../lib/supabase';
+
+let errorMessage: string | null = null;
+---
+
+<MainLayout title="Login - RiseSnow Club">
+  <main class="min-h-screen flex items-center justify-center bg-bg-light text-brand-blue p-4 pt-20">
+    <div class="w-full max-w-md bg-white rounded-lg shadow-2xl p-8 border-t-4 border-brand-blue">
+      <h2 class="font-serif text-3xl text-center uppercase tracking-widest text-brand-blue mb-8">Login / 登录</h2>
+      
+      <form id="login-form" class="space-y-6">
+        <div>
+          <label for="email" class="block text-sm font-semibold text-brand-blue/60 uppercase tracking-wider mb-2">Email Address</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            required
+            class="w-full px-4 py-3 rounded-md bg-bg-light border border-platinum focus:border-brand-blue focus:ring-1 focus:ring-brand-blue text-brand-blue outline-none transition-colors duration-200"
+            placeholder="your@email.com"
+          />
+        </div>
+        <div>
+          <label for="password" class="block text-sm font-semibold text-brand-blue/60 uppercase tracking-wider mb-2">Password</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            required
+            class="w-full px-4 py-3 rounded-md bg-bg-light border border-platinum focus:border-brand-blue focus:ring-1 focus:ring-brand-blue text-brand-blue outline-none transition-colors duration-200"
+            placeholder="••••••••"
+          />
+        </div>
+        
+        <p id="error-message" class="text-red-500 text-sm text-center hidden font-medium"></p>
+
+        <button
+          type="submit"
+          class="w-full bg-brand-blue text-white font-bold uppercase tracking-widest py-3 rounded-md hover:bg-opacity-90 transition-all duration-200 shadow-md"
+        >
+          Sign In
+        </button>
+      </form>
+
+      <p class="mt-8 text-center text-sm text-brand-blue/60">
+        Don't have an account? <a href="/register" class="text-brand-blue font-bold hover:underline">Register here</a>
+      </p>
+    </div>
+  </main>
+</MainLayout>
+
+<script>
+  import { supabase } from '../lib/supabase'; // Client-side import
+
+  const form = document.getElementById('login-form');
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const errorDisplay = document.getElementById('error-message');
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const email = emailInput.value;
+    const password = passwordInput.value;
+    errorDisplay.classList.add('hidden');
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      errorDisplay.textContent = error.message;
+      errorDisplay.classList.remove('hidden');
+    } else if (data.session) {
+      // If login is successful, send the session to our Astro API endpoint to set cookies
+      const response = await fetch('/api/set-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ event: 'SIGNED_IN', session: data.session }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to set session cookies on server.');
+      }
+      window.location.assign('/profile'); // 使用 assign 确保跳转
+    } else {
+      // 如果没有 session 但没有报错，通常是需要邮件确认
+      errorDisplay.textContent = "请检查您的邮箱以确认注册后再登录。";
+      errorDisplay.classList.remove('hidden');
+    }
+  });
+</script>

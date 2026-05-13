@@ -1,0 +1,151 @@
+---
+import MainLayout from '../layouts/MainLayout.astro';
+import { getSupabaseClient } from '../lib/supabase';
+
+const supabase = getSupabaseClient(Astro.cookies);
+const { data: { user } } = await supabase.auth.getUser();
+
+const { data: activities, error } = await supabase
+  .from('activities')
+  .select('*')
+  .order('date', { ascending: true });
+
+// 获取该用户已报名的所有活动 ID 列表
+let userRegistrations: string[] = [];
+if (user) {
+  const { data: regs } = await supabase
+    .from('registrations')
+    .select('activity_id')
+    .eq('user_id', user.id);
+  
+  userRegistrations = regs?.map((r: any) => r.activity_id) || [];
+}
+---
+
+<MainLayout title="Activities - RiseSnow Club">
+  <main class="pt-32 px-8 max-w-7xl mx-auto">
+    <h2 class="font-serif text-4xl uppercase tracking-widest border-b border-platinum pb-4 mb-12">Upcoming Activities</h2>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+      {activities?.map((activity) => {
+        const isRegistered = userRegistrations.includes(activity.id);
+        return (
+          <div class="group border border-platinum p-6 hover:border-accent-yellow transition-colors duration-300 bg-white shadow-sm">
+            <div class="flex justify-between items-start mb-4">
+              <h3 class="font-serif text-2xl uppercase tracking-tight">{activity.title}</h3>
+              <span class="text-brand-blue/60 text-xs tracking-widest uppercase">{activity.date}</span>
+            </div>
+            <p class="text-brand-black/70 font-light mb-6 leading-relaxed">{activity.description}</p>
+            <button
+              class={`register-btn text-[10px] uppercase tracking-[0.2em] border-b pb-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                isRegistered ? 'border-gray-300 text-gray-400 cursor-default' : 'border-accent-yellow text-accent-yellow hover:text-accent-yellow cursor-pointer'
+              }`}
+              data-id={activity.id}
+              data-title={activity.title}
+              disabled={isRegistered}
+            >
+              {isRegistered ? 'Already Registered / 已报名' : 'Register Interest / 报名'}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+
+    <!-- Toast 提示容器 -->
+    <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-full bg-brand-blue/90 backdrop-blur-md text-white text-sm font-medium shadow-2xl transition-all duration-500 opacity-0 pointer-events-none translate-y-10 flex items-center space-x-2">
+      <svg id="toast-icon-success" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-400 hidden" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+      </svg>
+      <svg id="toast-icon-error" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-200 hidden" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+      </svg>
+      <span id="toast-message"></span>
+    </div>
+  </main>
+</MainLayout>
+
+<script>
+  import { supabase } from '../lib/supabase';
+
+  // 获取所有报名按钮
+  const registerButtons = document.querySelectorAll('.register-btn');
+  const toast = document.getElementById('toast');
+  const toastMessage = document.getElementById('toast-message');
+  const iconSuccess = document.getElementById('toast-icon-success');
+  const iconError = document.getElementById('toast-icon-error');
+
+  function showToast(message: string, isError = false) {
+    if (!toast || !toastMessage || !iconSuccess || !iconError) return;
+    
+    toastMessage.textContent = message;
+    
+    // 根据状态切换背景颜色和图标
+    toast.classList.toggle('bg-red-600/90', isError);
+    toast.classList.toggle('bg-red-500/90', false); // 清除旧的颜色类
+    toast.classList.toggle('bg-brand-blue/90', !isError);
+    iconSuccess.classList.toggle('hidden', isError);
+    iconError.classList.toggle('hidden', !isError);
+
+    // 进场动画
+    toast.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
+    toast.classList.add('opacity-100', 'translate-y-0');
+
+    // 如果不涉及跳转，3秒后自动消失
+    setTimeout(() => {
+      toast.classList.remove('opacity-100', 'translate-y-0');
+      toast.classList.add('opacity-0', 'translate-y-10', 'pointer-events-none');
+    }, 3000);
+  }
+
+  registerButtons.forEach(button => {
+    button.addEventListener('click', async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      const originalText = btn.textContent;
+      
+      // 进入加载状态
+      btn.disabled = true;
+      btn.textContent = 'Processing... / 处理中...';
+
+      // 检查 Supabase 登录状态
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        showToast('Please login first! / 请先登录以报名活动！', true);
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 1000);
+      } else {
+        const activityId = button.getAttribute('data-id');
+        const activityTitle = button.getAttribute('data-title');
+
+        // 将报名信息写入 registrations 表
+        const { error } = await supabase
+          .from('registrations')
+          .insert({
+            user_id: user.id,
+            activity_id: activityId,
+            status: 'pending' // 初始状态为待审核
+          });
+
+        if (error) {
+          // 如果设置了唯一约束，重复报名会报 23505 错误
+          if (error.code === '23505') {
+            showToast(`Already registered for "${activityTitle}". / 您已报名过该活动。`, true);
+          } else {
+            showToast('Registration failed: ' + error.message, true);
+          }
+          
+          // 发生错误时，恢复按钮状态以便用户重试
+          btn.disabled = false;
+          btn.textContent = originalText;
+        } else {
+          showToast(`Successfully registered for "${activityTitle}"! / 报名成功！`);
+          // 给用户一点时间看清 Toast
+          setTimeout(() => {
+            window.location.href = '/profile';
+          }, 1200);
+        }
+      }
+    });
+  });
+</script>

@@ -1,0 +1,106 @@
+---
+import { getSupabaseClient } from '../lib/supabase';
+
+// For server-side rendering (SSR) in Astro, we need to pass the request's cookies
+// to the Supabase client so it can detect the session.
+const serverSupabase = getSupabaseClient(Astro.cookies);
+const { data: { user } } = await serverSupabase.auth.getUser();
+
+// 优先从 profiles 数据库表中获取最新的姓名
+let profileName = null;
+if (user) {
+  const { data: profile } = await serverSupabase
+    .from('profiles')
+    .select('full_name')
+    .eq('user_id', user.id)
+    .single();
+  profileName = profile?.full_name;
+}
+
+// 优先级：数据库姓名 > Auth元数据 > 邮箱
+const userName = profileName || user?.user_metadata?.full_name || user?.email;
+---
+
+<nav class="fixed top-0 w-full z-50 px-8 py-4 flex justify-between items-center bg-white shadow-sm border-b border-platinum text-brand-blue transition-all duration-300 font-sans">
+  <div class="font-serif text-2xl tracking-tighter uppercase italic font-bold">
+    <a href="/" class="text-brand-blue">RiseSnow</a>
+  </div>
+
+  <!-- 移动端菜单按钮 (Hamburger Icon) -->
+  <button id="mobile-menu-button" class="md:hidden p-2 text-brand-blue focus:outline-none" aria-label="Menu">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+    </svg>
+  </button>
+
+  <!-- 桌面端导航 -->
+  <div class="hidden md:flex space-x-8 items-center text-[10px] uppercase tracking-[0.3em] font-light">
+    {user && <span class="text-brand-blue/60 text-xs normal-case">Hello, {userName}</span>}
+    <a href="/activities" class="hover:text-accent-yellow transition-colors font-semibold">Activities / 活动</a>
+    <a href="/coaches" class="hover:text-accent-yellow transition-colors font-semibold">Coaches / 教练</a>
+    {user ? (
+      <>
+        <a href="/profile" class="hover:text-accent-yellow transition-colors font-semibold">Profile / 个人中心</a>
+        <button id="logout-button" class="hover:text-accent-yellow transition-colors cursor-pointer text-[10px] uppercase tracking-[0.3em] font-semibold">Logout / 退出</button>
+      </>
+    ) : (
+      <>
+        <a href="/login" class="hover:text-accent-yellow transition-colors font-semibold">Login / 登录</a>
+        <a href="/register" class="hover:text-accent-yellow transition-colors font-semibold">Register / 注册</a>
+      </>
+    )}
+  </div>
+
+  <!-- 移动端下拉菜单容器 -->
+  <div id="mobile-menu" class="hidden absolute top-full left-0 w-full bg-white border-b border-platinum shadow-lg md:hidden">
+    <div class="flex flex-col p-6 space-y-4 text-[12px] uppercase tracking-[0.2em] font-light">
+      {user && <div class="text-brand-blue/40 text-[10px] normal-case border-b border-platinum pb-2">Hello, {userName}</div>}
+      <a href="/activities" class="hover:text-accent-yellow transition-colors font-semibold py-2">Activities / 活动</a>
+      <a href="/coaches" class="hover:text-accent-yellow transition-colors font-semibold py-2">Coaches / 教练</a>
+      {user ? (
+        <>
+          <a href="/profile" class="hover:text-accent-yellow transition-colors font-semibold py-2 border-t border-platinum pt-4">Profile / 个人中心</a>
+          <button id="logout-button-mobile" class="text-left hover:text-accent-yellow transition-colors cursor-pointer font-semibold py-2">Logout / 退出</button>
+        </>
+      ) : (
+        <>
+          <a href="/login" class="hover:text-accent-yellow transition-colors font-semibold py-2 border-t border-platinum pt-4">Login / 登录</a>
+          <a href="/register" class="hover:text-accent-yellow transition-colors font-semibold py-2">Register / 注册</a>
+        </>
+      )}
+    </div>
+  </div>
+</nav>
+
+<script>
+  import { supabase } from '../lib/supabase';
+
+  // 移动端菜单切换逻辑
+  const menuButton = document.getElementById('mobile-menu-button');
+  const mobileMenu = document.getElementById('mobile-menu');
+
+  menuButton?.addEventListener('click', (e) => {
+    e.stopPropagation(); // 阻止事件冒泡，防止触发下方的 document 监听
+    mobileMenu?.classList.toggle('hidden');
+  });
+
+  // 监听全局点击事件
+  document.addEventListener('click', (event) => {
+    const target = event.target as Node;
+    
+    // 如果点击的不是菜单本身，也不是切换按钮，则隐藏菜单
+    if (mobileMenu && !mobileMenu.contains(target) && !menuButton?.contains(target)) {
+      mobileMenu.classList.add('hidden');
+    }
+  });
+
+  // 退出登录逻辑 (兼容桌面端和移动端按钮)
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    await fetch('/api/clear-session', { method: 'POST' });
+    window.location.href = '/login';
+  }
+
+  document.getElementById('logout-button')?.addEventListener('click', handleLogout);
+  document.getElementById('logout-button-mobile')?.addEventListener('click', handleLogout);
+</script>

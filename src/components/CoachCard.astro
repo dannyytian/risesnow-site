@@ -1,0 +1,24 @@
+---
+interface Props {
+  name: string;
+  specialty: string;
+  bio: string;
+  image: string;
+  experience: string;
+}
+
+const { name, specialty, bio, image, experience } = Astro.props;
+---
+
+<div class="break-inside-avoid-column bg-platinum-light/10 p-6 mb-8 border border-platinum/30 rounded-lg shadow-sm hover:shadow-md hover:border-gold-accent transition-all duration-300">
+  <img 
+    src={image} 
+    alt={name} 
+    class="w-full h-auto object-cover rounded-md mb-4 aspect-square"
+    loading="lazy"
+  />
+  <h3 class="font-serif text-2xl uppercase tracking-tight text-gold-accent mb-2">{name}</h3>
+  <p class="text-sm uppercase tracking-wide text-platinum-light mb-4">{specialty}</p>
+  <p class="text-brand-black/80 text-base leading-relaxed mb-4">{bio}</p>
+  <p class="text-brand-black/60 text-sm italic">Experience: {experience}</p>
+</div>

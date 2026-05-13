@@ -1,0 +1,28 @@
+---
+import MainLayout from '../layouts/MainLayout.astro';
+import CoachCard from '../components/CoachCard.astro';
+import { supabase } from '../lib/supabase';
+
+// 从 Supabase 抓取实时教练数据
+const { data: coaches, error } = await supabase
+  .from('coaches')
+  .select('*')
+  .order('name', { ascending: true });
+---
+
+<MainLayout title="Coaches - RiseSnow Club">
+  <main class="pt-32 px-8 max-w-7xl mx-auto">
+    <h2 class="font-serif text-4xl uppercase tracking-widest border-b border-platinum pb-4 mb-12">Our Elite Coaches</h2>
+    <div class="columns-1 sm:columns-2 lg:columns-3 gap-8">
+      {coaches?.map(coach => (
+        <CoachCard 
+          name={coach.name}
+          specialty={coach.specialty}
+          bio={coach.bio}
+          image={coach.image_url}
+          experience={coach.experience}
+        />
+      ))}
+    </div>
+  </main>
+</MainLayout>

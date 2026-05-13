@@ -1,17 +1,80 @@
 ---
+import MainLayout from '../layouts/MainLayout.astro';
+import { supabase } from '../lib/supabase';
 
+// 获取前 3 条即将开始的活动
+const { data: upcomingEvents, error } = await supabase
+  .from('activities')
+  .select('*')
+  .limit(3)
+  .order('date', { ascending: true });
+
+if (error) {
+  console.error('Error fetching activities:', error.message);
+}
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<MainLayout title="RiseSnow Club | 极境雪原">
+	<main>
+		<!-- Hero Section -->
+		<section class="relative h-screen flex items-center justify-center overflow-hidden bg-brand-blue">
+			<!-- Banner 背景容器 -->
+			<div class="absolute inset-0 z-0">
+				<!-- 磨砂玻璃遮罩：通过模糊背景图并叠加半透明品牌色，显著提升白色文字的可读性 -->
+				<div class="absolute inset-0 bg-brand-blue/40 backdrop-blur-[4px] z-10"></div>
+				<img 
+					src="https://images.unsplash.com/photo-1414238974778-43999499806b" 
+					alt="RiseSnow Club Banner" 
+					class="w-full h-full object-cover opacity-70"
+					loading="eager"
+					fetchpriority="high"
+				/>
+			</div>
+			
+			<div class="relative z-20 text-center text-white px-4">
+				<h1 class="animate-fade-in-up font-serif text-6xl md:text-9xl tracking-[0.2em] uppercase mb-6 drop-shadow-2xl">
+					RiseSnow
+				</h1>
+				<p class="animate-fade-in-up [animation-delay:200ms] text-platinum-light tracking-[0.6em] text-xs md:text-sm uppercase font-light mb-12 opacity-0 [animation-fill-mode:forwards]">
+					Elevating Your Alpine Experience
+				</p>
+				<a href="/activities" class="animate-fade-in-up [animation-delay:400ms] opacity-0 [animation-fill-mode:forwards] inline-block px-10 py-4 border border-accent-yellow text-accent-yellow text-[10px] tracking-[0.3em] uppercase hover:bg-accent-yellow hover:text-brand-blue transition-all duration-500">
+					Explore Trips / 探索行程
+				</a>
+			</div>
+		</section>
+
+		<!-- Upcoming Events Section -->
+		<section class="py-24 px-8 bg-snow-white">
+			<div class="max-w-7xl mx-auto">
+				<div class="flex justify-between items-end mb-16 border-b border-platinum pb-6">
+					<h2 class="font-serif text-4xl uppercase tracking-widest">Upcoming Events</h2>
+					<a href="/activities" class="text-xs tracking-widest uppercase text-accent-yellow hover:opacity-70 transition-opacity">View All / 查看全部</a>
+				</div>
+
+				<div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+					{upcomingEvents?.map((event) => (
+						<div class="group cursor-pointer bg-white p-6 rounded-2xl border border-platinum/50 transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_30px_60px_-15px_rgba(0,51,102,0.15),0_0_25px_rgba(255,215,0,0.25)] hover:border-accent-yellow/40">
+							<div class="overflow-hidden mb-6 bg-platinum aspect-[4/5] relative rounded-xl">
+								<div class="absolute inset-0 bg-brand-blue/10 group-hover:bg-transparent transition-colors duration-500 z-10"></div>
+								<img
+									src={(event.image_url && event.image_url.trim() !== "") ? event.image_url.split('?')[0] : "https://images.unsplash.com/photo-1551698618-1dfe5d97d256"}
+									alt={event.title || "Activity Image"}
+									class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
+									loading="lazy"
+								/>
+							</div>
+							<p class="text-brand-blue/60 text-[10px] tracking-[0.2em] uppercase mb-2">{event.date}</p>
+							<h3 class="font-serif text-xl uppercase mb-4 group-hover:text-brand-blue transition-colors leading-tight">
+								{event.title}
+							</h3>
+							<p class="text-brand-blue/70 text-sm font-light leading-relaxed line-clamp-2">
+								{event.description}
+							</p>
+						</div>
+					))}
+				</div>
+			</div>
+		</section>
+	</main>
+</MainLayout>
