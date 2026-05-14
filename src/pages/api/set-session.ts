@@ -1,24 +1,17 @@
 import type { APIRoute } from 'astro';
+import { getSupabaseClient } from '../../lib/supabase';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   const { event, session } = await request.json();
 
   if (event === 'SIGNED_IN' && session) {
-    // Set the access token and refresh token in Astro cookies
-    // These cookie names are what Supabase's server-side client expects to read
-    cookies.set('sb-access-token', session.access_token, {
-      path: '/',
-      secure: import.meta.env.PROD, // 仅在生产环境启用安全传输
-      httpOnly: true, // Prevent client-side JavaScript access
-      sameSite: 'lax',
-      maxAge: session.expires_in,
-    });
-    cookies.set('sb-refresh-token', session.refresh_token, {
-      path: '/',
-      secure: import.meta.env.PROD, // 仅在生产环境启用安全传输
-      httpOnly: true,
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // Refresh token typically lasts longer, e.g., 7 days
+    // 使用统一的客户端工厂函数
+    const supabase = getSupabaseClient(cookies);
+    
+    // 调用 setSession 会自动触发 supabase.ts 中定义的 storage.setItem 逻辑
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token
     });
 
     return new Response(JSON.stringify({ message: 'Session set' }), { status: 200 });

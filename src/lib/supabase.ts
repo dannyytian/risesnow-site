@@ -8,8 +8,10 @@ import { createClient } from '@supabase/supabase-js';
 //   console.warn("Supabase credentials missing. Check your .env file.");
 // }
 // 尝试两种方式读取，增加兼容性
-const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL || process.env.PUBLIC_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || process.env.PUBLIC_SUPABASE_ANON_KEY
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL || 
+                   (globalThis as any).process?.env?.PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || 
+                      (globalThis as any).process?.env?.PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl) {
   // 这行日志会出现在你刚才看到的 Real-time Logs 里，帮我们最终确认
@@ -31,7 +33,16 @@ export const getSupabaseClient = (cookies: { get: (k: string) => any, set: Funct
       flowType: 'pkce',
       storage: {
         getItem: (key) => cookies.get(key)?.value,
-        setItem: (key, value, options) => cookies.set(key, value, { path: '/', ...options }),
+        setItem: (key, value, options) => {
+          cookies.set(key, value, { 
+            path: '/', 
+            secure: true,      // 必须开启，因为生产环境是 HTTPS
+            sameSite: 'lax',   // 允许在重定向时携带 Cookie
+            httpOnly: false,   // 如果前端需要访问 Supabase SDK 状态，设为 false
+            maxAge: 60 * 60 * 24 * 7, // 显式设置 7 天有效期
+            ...options 
+          })
+        },
         removeItem: (key, options) => cookies.delete(key, { path: '/', ...options }),
       },
     },
