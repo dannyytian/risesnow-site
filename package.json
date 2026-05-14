@@ -19,6 +19,7 @@
     "tailwindcss": "^3.4.17"
   },
   "devDependencies": {
+    "typescript": "^5.7.3",
     "wrangler": "^3.109.1"
   }
 }
