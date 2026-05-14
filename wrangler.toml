@@ -3,9 +3,5 @@ name = "risesnow-site"
 compatibility_date = "2024-04-03"
 pages_build_output_dir = "./dist"
 
-[[kv_namespaces]]
-binding = "SESSION"
-id = "local_dev_session"
-
 [vars]
 # Put non-secret environment variables here if needed
