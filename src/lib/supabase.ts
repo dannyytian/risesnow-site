@@ -18,27 +18,33 @@ if (!supabaseUrl) {
   console.error("Critical: PUBLIC_SUPABASE_URL is missing from environment!");
 }
 
-//export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co', // 占位符防止构建崩溃
-  supabaseAnonKey || 'placeholder'
+  supabaseUrl || 'https://placeholder.supabase.co', 
+  supabaseAnonKey || '',
+  {
+    auth: { persistSession: false }
+  }
 );
 /**
  * 为服务端渲染（SSR）创建一个请求相关的 Supabase 客户端。
  * 它通过对接 Astro 的 cookies 对象，使服务器能识别用户的登录状态。
  */
 export const getSupabaseClient = (cookies: { get: (k: string) => any, set: Function, delete: Function }) => {
-  return createClient(supabaseUrl, supabaseAnonKey, {
+  // 如果 URL 缺失，createClient 内部会报错，这里提供占位符确保不会在初始化阶段就崩溃
+  const url = supabaseUrl || 'https://placeholder.supabase.co';
+  const key = supabaseAnonKey || '';
+
+  return createClient(url, key, {
     auth: {
       flowType: 'pkce',
       storage: {
         getItem: (key) => cookies.get(key)?.value,
         setItem: (key, value, options) => {
-          cookies.set(key, value, { 
-            path: '/', 
-            secure: true,      // 必须开启，因为生产环境是 HTTPS
+          cookies.set(key, value, {
+            path: '/',
+            secure: import.meta.env.PROD, // 生产环境开启，本地开发关闭以增加兼容性
             sameSite: 'lax',   // 允许在重定向时携带 Cookie
-            httpOnly: false,   // 如果前端需要访问 Supabase SDK 状态，设为 false
+            httpOnly: false,   // 允许前端 SDK 访问 Auth 状态
             maxAge: 60 * 60 * 24 * 7, // 显式设置 7 天有效期
             ...options 
           })

@@ -8,7 +8,8 @@ export default defineConfig({
     adapter: cloudflare({
     imageService: 'compile',
     platformProxy: {
-      enabled: true,
+      // 在 Windows 开发环境下禁用代理以防止 workerd 崩溃
+      enabled: false,
     },
   }),
   integrations: [tailwind()]
