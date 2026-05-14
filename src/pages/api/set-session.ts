@@ -4,7 +4,7 @@ import { getSupabaseClient } from '../../lib/supabase';
 export const POST: APIRoute = async ({ request, cookies }) => {
   const { event, session } = await request.json();
 
-  if (event === 'SIGNED_IN' && session) {
+  if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
     // 使用统一的客户端工厂函数
     const supabase = getSupabaseClient(cookies);
     

@@ -10,35 +10,38 @@ const { data: upcomingEvents, error } = await supabase
   .order('date', { ascending: true });
 
 if (error) {
-  console.error('Error fetching activities:', error.message);
+  console.warn('Activities could not be loaded for the homepage:', error.message);
 }
 ---
 
-<MainLayout title="RiseSnow Club | 极境雪原">
+<MainLayout title="RiseSnow Club | 凌雪技巧">
 	<main>
 		<!-- Hero Section -->
-		<section class="relative h-screen flex items-center justify-center overflow-hidden bg-brand-blue">
+		<section class="relative h-dvh flex items-center justify-center overflow-hidden bg-brand-blue">
 			<!-- Banner 背景容器 -->
 			<div class="absolute inset-0 z-0">
 				<!-- 磨砂玻璃遮罩：通过模糊背景图并叠加半透明品牌色，显著提升白色文字的可读性 -->
 				<div class="absolute inset-0 bg-brand-blue/40 backdrop-blur-[4px] z-10"></div>
 				<img 
-					src="https://images.unsplash.com/photo-1414238974778-43999499806b" 
+					src="/banner.png" 
 					alt="RiseSnow Club Banner" 
-					class="w-full h-full object-cover opacity-70"
+					class="w-full h-full object-cover object-center opacity-70"
 					loading="eager"
 					fetchpriority="high"
 				/>
 			</div>
 			
 			<div class="relative z-20 text-center text-white px-4">
-				<h1 class="animate-fade-in-up font-serif text-6xl md:text-9xl tracking-[0.2em] uppercase mb-6 drop-shadow-2xl">
+				<h1 class="animate-fade-in-up font-serif text-4xl md:text-8xl lg:text-9xl tracking-[0.2em] uppercase mb-2 drop-shadow-2xl">
 					RiseSnow
 				</h1>
-				<p class="animate-fade-in-up [animation-delay:200ms] text-platinum-light tracking-[0.6em] text-xs md:text-sm uppercase font-light mb-12 opacity-0 [animation-fill-mode:forwards]">
+				<h2 class="animate-fade-in-up [animation-delay:150ms] opacity-0 [animation-fill-mode:forwards] font-serif text-2xl md:text-5xl lg:text-6xl tracking-[0.1em] mb-8 drop-shadow-lg">
+					凌雪技巧俱乐部
+				</h2>
+				<p class="animate-fade-in-up [animation-delay:300ms] text-platinum-light tracking-[0.6em] text-xs md:text-sm uppercase font-light mb-12 opacity-0 [animation-fill-mode:forwards]">
 					Elevating Your Alpine Experience
 				</p>
-				<a href="/activities" class="animate-fade-in-up [animation-delay:400ms] opacity-0 [animation-fill-mode:forwards] inline-block px-10 py-4 border border-accent-yellow text-accent-yellow text-[10px] tracking-[0.3em] uppercase hover:bg-accent-yellow hover:text-brand-blue transition-all duration-500">
+				<a href="/activities" class="animate-fade-in-up [animation-delay:450ms] opacity-0 [animation-fill-mode:forwards] inline-block px-10 py-4 border border-accent-yellow text-accent-yellow text-xs md:text-sm tracking-[0.3em] uppercase hover:bg-accent-yellow hover:text-brand-blue transition-all duration-500">
 					Explore Trips / 探索行程
 				</a>
 			</div>

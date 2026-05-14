@@ -21,3 +21,40 @@ const { title } = Astro.props;
 		<slot />
 	</body>
 </html>
+
+<script>
+  import { supabase } from '../lib/supabase';
+
+  // 监听身份验证状态变化 (在浏览器端运行)
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    try {
+      if (event === 'SIGNED_OUT') {
+        // 情况 A: 用户主动登出或 Session 到期刷新失败
+        // 同步清除服务器端 Cookie
+        await fetch('/api/clear-session', { method: 'POST' });
+        
+        // 如果当前不在登录相关页面，则强制跳转
+        const protectedPaths = ['/profile', '/dashboard']; // 定义需要登录的路径
+        const isProtected = protectedPaths.some(path => window.location.pathname.startsWith(path));
+        
+        if (isProtected || window.location.pathname === '/profile') {
+          window.location.href = '/login';
+        }
+      } else if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+        // 情况 B: Token 自动刷新成功
+        // 必须同步到服务器 Cookie，否则 SSR 页面会因为旧 Cookie 校验失败而崩溃
+        if (session) {
+          await fetch('/api/set-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ event, session })
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Supabase Auth State Change Handler Error:', error);
+      // 可以在这里添加一个用户友好的提示，或者强制跳转到登录页
+      // window.location.href = '/login?error=auth_failed';
+    }
+  });
+</script>

@@ -1,25 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
-// 使用 ImportMetaEnv 来获取环境变量，确保在 .env 文件中定义了这些变量
-// const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-// const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
-
-// if (!supabaseUrl || !supabaseAnonKey) {
-//   console.warn("Supabase credentials missing. Check your .env file.");
-// }
-// 尝试两种方式读取，增加兼容性
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL || 
                    (globalThis as any).process?.env?.PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || 
                       (globalThis as any).process?.env?.PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl) {
-  // 这行日志会出现在你刚才看到的 Real-time Logs 里，帮我们最终确认
-  console.error("Critical: PUBLIC_SUPABASE_URL is missing from environment!");
+  // 改为 warn，避免开发时终端一片红，因为某些构建阶段变量确实可能延迟注入
+  console.warn("Supabase URL is temporarily missing during initialization.");
 }
 
 export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co', 
+  supabaseUrl || 'https://your-project.supabase.co', 
   supabaseAnonKey || '',
   {
     auth: { persistSession: false }

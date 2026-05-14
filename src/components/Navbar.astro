@@ -3,27 +3,36 @@ import { getSupabaseClient } from '../lib/supabase';
 
 // For server-side rendering (SSR) in Astro, we need to pass the request's cookies
 // to the Supabase client so it can detect the session.
-const serverSupabase = getSupabaseClient(Astro.cookies);
-const { data: { user } } = await serverSupabase.auth.getUser();
 
-// 优先从 profiles 数据库表中获取最新的姓名
+let user = null;
 let profileName = null;
-if (user) {
-  const { data: profile } = await serverSupabase
-    .from('profiles')
-    .select('full_name')
-    .eq('user_id', user.id)
-    .single();
-  profileName = profile?.full_name;
+
+// 只有在没有重定向发生时才尝试获取用户数据。
+// 这可以防止在响应已发送后尝试设置 Cookie。
+if (!Astro.response.headers.has('Location')) {
+  const serverSupabase = getSupabaseClient(Astro.cookies);
+  const { data: userData } = await serverSupabase.auth.getUser();
+  user = userData?.user;
+
+  if (user) {
+    const { data: profile } = await serverSupabase
+      .from('profiles')
+      .select('full_name')
+      .eq('user_id', user.id)
+      .single();
+    profileName = profile?.full_name;
+  }
 }
 
 // 优先级：数据库姓名 > Auth元数据 > 邮箱
 const userName = profileName || user?.user_metadata?.full_name || user?.email;
 ---
 
-<nav class="fixed top-0 w-full z-50 px-8 py-4 flex justify-between items-center bg-white shadow-sm border-b border-platinum text-brand-blue transition-all duration-300 font-sans">
+ <nav class="fixed top-0 w-full z-50 px-8 py-2 flex justify-between items-center bg-white shadow-sm border-b border-platinum text-brand-blue transition-all duration-300 font-sans">
   <div class="font-serif text-2xl tracking-tighter uppercase italic font-bold">
-    <a href="/" class="text-brand-blue">RiseSnow</a>
+    <a href="/" class="flex items-center">
+      <img src="/logo.png" alt="RiseSnow Logo" class="h-16 md:h-18 w-auto object-contain transition-transform hover:scale-105"  />
+    </a>
   </div>
 
   <!-- 移动端菜单按钮 (Hamburger Icon) -->
@@ -34,14 +43,14 @@ const userName = profileName || user?.user_metadata?.full_name || user?.email;
   </button>
 
   <!-- 桌面端导航 -->
-  <div class="hidden md:flex space-x-8 items-center text-[10px] uppercase tracking-[0.3em] font-light">
-    {user && <span class="text-brand-blue/60 text-xs normal-case">Hello, {userName}</span>}
+  <div class="hidden md:flex space-x-8 items-center text-xs uppercase tracking-[0.3em] font-light">
+    {user && <span class="text-brand-blue/60 normal-case">Hello, {userName}</span>}
     <a href="/activities" class="hover:text-accent-yellow transition-colors font-semibold">Activities / 活动</a>
     <a href="/coaches" class="hover:text-accent-yellow transition-colors font-semibold">Coaches / 教练</a>
     {user ? (
       <>
         <a href="/profile" class="hover:text-accent-yellow transition-colors font-semibold">Profile / 个人中心</a>
-        <button id="logout-button" class="hover:text-accent-yellow transition-colors cursor-pointer text-[10px] uppercase tracking-[0.3em] font-semibold">Logout / 退出</button>
+        <button id="logout-button" class="hover:text-accent-yellow transition-colors cursor-pointer uppercase tracking-[0.3em] font-semibold">Logout / 退出</button>
       </>
     ) : (
       <>
@@ -53,8 +62,8 @@ const userName = profileName || user?.user_metadata?.full_name || user?.email;
 
   <!-- 移动端下拉菜单容器 -->
   <div id="mobile-menu" class="hidden absolute top-full left-0 w-full bg-white border-b border-platinum shadow-lg md:hidden">
-    <div class="flex flex-col p-6 space-y-4 text-[12px] uppercase tracking-[0.2em] font-light">
-      {user && <div class="text-brand-blue/40 text-[10px] normal-case border-b border-platinum pb-2">Hello, {userName}</div>}
+    <div class="flex flex-col p-6 space-y-4 text-sm uppercase tracking-[0.2em] font-light">
+      {user && <div class="text-brand-blue/40 text-sm normal-case border-b border-platinum pb-2">Hello, {userName}</div>}
       <a href="/activities" class="hover:text-accent-yellow transition-colors font-semibold py-2">Activities / 活动</a>
       <a href="/coaches" class="hover:text-accent-yellow transition-colors font-semibold py-2">Coaches / 教练</a>
       {user ? (
@@ -96,9 +105,8 @@ const userName = profileName || user?.user_metadata?.full_name || user?.email;
 
   // 退出登录逻辑 (兼容桌面端和移动端按钮)
   async function handleLogout() {
+    // 只需调用 signOut，MainLayout 中的监听器会负责 fetch('/api/clear-session') 和跳转
     await supabase.auth.signOut();
-    await fetch('/api/clear-session', { method: 'POST' });
-    window.location.href = '/login';
   }
 
   document.getElementById('logout-button')?.addEventListener('click', handleLogout);

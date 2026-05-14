@@ -12,5 +12,8 @@ export default defineConfig({
       enabled: false,
     },
   }),
-  integrations: [tailwind()]
+  integrations: [tailwind()],
+  server: {
+    host: true, // 确保服务器监听所有网络接口
+  }
 });
