@@ -16,7 +16,6 @@ if (!supabaseUrl) {
   console.error("Critical: PUBLIC_SUPABASE_URL is missing from environment!");
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '')
 //export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co', // 占位符防止构建崩溃
