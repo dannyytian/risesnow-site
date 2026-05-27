@@ -6,6 +6,9 @@ const supabase = getSupabaseClient(Astro.cookies);
 const { data, error } = await supabase.auth.getUser();
 const user = data?.user;
 
+// Share user with the Navbar to avoid redundant session refreshes during rendering
+if (user) (Astro.locals as any).user = user;
+
 if (error ||!user) {
   return Astro.redirect('/login');
 }

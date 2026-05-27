@@ -32,14 +32,19 @@ export const getSupabaseClient = (cookies: { get: (k: string) => any, set: Funct
       storage: {
         getItem: (key) => cookies.get(key)?.value,
         setItem: (key, value, options) => {
-          cookies.set(key, value, {
-            path: '/',
-            secure: import.meta.env.PROD, // 生产环境开启，本地开发关闭以增加兼容性
-            sameSite: 'lax',   // 允许在重定向时携带 Cookie
-            httpOnly: false,   // 允许前端 SDK 访问 Auth 状态
-            maxAge: 60 * 60 * 24 * 7, // 显式设置 7 天有效期
-            ...options 
-          })
+          try {
+            cookies.set(key, value, {
+              path: '/',
+              secure: import.meta.env.PROD, // 生产环境开启，本地开发关闭以增加兼容性
+              sameSite: 'lax',   // 允许在重定向时携带 Cookie
+              httpOnly: false,   // 允许前端 SDK 访问 Auth 状态
+              maxAge: 60 * 60 * 24 * 7, // 显式设置 7 天有效期
+              ...options 
+            })
+          } catch (e) {
+            // Silence error if headers are already sent during streaming
+            console.warn('[Supabase Storage] Notice: Could not set auth cookie because headers were already sent.');
+          }
         },
         removeItem: (key, options) => cookies.delete(key, { path: '/', ...options }),
       },

@@ -4,12 +4,12 @@ import { getSupabaseClient } from '../lib/supabase';
 // For server-side rendering (SSR) in Astro, we need to pass the request's cookies
 // to the Supabase client so it can detect the session.
 
-let user = null;
+let user = (Astro.locals as any).user || null;
 let profileName = null;
 
 // 只有在没有重定向发生时才尝试获取用户数据。
 // 这可以防止在响应已发送后尝试设置 Cookie。
-if (!Astro.response.headers.has('Location')) {
+if (!user && !Astro.response.headers.has('Location')) {
   const serverSupabase = getSupabaseClient(Astro.cookies);
   const { data: userData } = await serverSupabase.auth.getUser();
   user = userData?.user;
