@@ -1,29 +1,20 @@
 ---
 import MainLayout from '../layouts/MainLayout.astro';
 import { getSupabaseClient } from '../lib/supabase';
+// 假设你已经将类型提取到了统一文件中
+import type { Profile, RegistrationWithActivity } from '../types/database';
 
 const supabase = getSupabaseClient(Astro.cookies);
 const { data, error } = await supabase.auth.getUser();
 const user = data?.user;
 
-// Share user with the Navbar to avoid redundant session refreshes during rendering
 if (user) (Astro.locals as any).user = user;
 
-if (error ||!user) {
+if (error || !user) {
   return Astro.redirect('/login');
 }
 
-export interface Profile {
-  user_id: string;
-  full_name: string | null;
-  phone: string | null;
-  gender: string | null;
-  birth_year: number | null;
-  skill_level: string | null;
-  bio: string | null;
-}
-
-// 从 profiles 表获取详细信息
+// 业务逻辑：获取或创建 Profile
 let { data: profileData, error: profileError } = await supabase
   .from('profiles')
   .select('*')
@@ -32,28 +23,17 @@ let { data: profileData, error: profileError } = await supabase
 
 let profile = profileData as unknown as Profile | null;
 
-// 如果没有找到 profile 记录 (PGRST116)，则自动创建一条初始记录
 if (!profile || (profileError && profileError.code === 'PGRST116')) {
   const { data: newProfile, error: createError } = await supabase
     .from('profiles')
-    .upsert({
+    .insert({
       user_id: user.id,
       full_name: user.user_metadata?.full_name || '',
-    }, { onConflict: 'user_id' })
+    })
     .select()
     .single();
 
   if (!createError) profile = newProfile as unknown as Profile;
-}
-
-interface RegistrationWithActivity {
-  id: string;
-  status: string;
-  activities: {
-    title: string;
-    date: string;
-    location: string;
-  } | null;
 }
 
 // 获取该用户已报名的活动列表及活动详情
@@ -73,17 +53,16 @@ const { data: registrationsData } = await supabase
 
 const myRegistrations = registrationsData as unknown as RegistrationWithActivity[] | null;
 
-// 生成年份列表，从当前年份倒序到 1940
-const currentYear = new Date().getFullYear();
-const birthYears = Array.from({ length: currentYear - 1940 + 1 }, (_, i) => currentYear - i);
+// 提取显示名称的统一逻辑：优先从数据库获取，其次从 Auth 元数据获取
+const displayName = profile?.full_name || user.user_metadata?.full_name || 'Valued Member';
 ---
 
 <MainLayout title="Profile Settings - RiseSnow Club">
   <main class="min-h-screen pt-32 px-8 flex justify-center bg-snow-white font-sans">
     <div class="w-full max-w-md">
-      <h2 class="font-serif text-3xl uppercase tracking-widest text-brand-black mb-8 border-b border-platinum pb-4">Profile Settings</h2>
+      <h2 class="font-serif text-3xl uppercase tracking-widest text-brand-black mb-8 border-b border-platinum pb-4">Welcome, {displayName}</h2>
       
-      <form id="profile-form" class="space-y-6">
+      <form id="profile-form" class="space-y-6" data-expected-name={displayName}>
         <div>
           <label class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black/60 mb-2">Email (Static)</label>
           <input type="text" value={user.email} disabled class="w-full px-4 py-3 bg-platinum/30 border border-platinum text-brand-black/50 rounded-md cursor-not-allowed" />
@@ -96,12 +75,26 @@ const birthYears = Array.from({ length: currentYear - 1940 + 1 }, (_, i) => curr
             id="full_name"
             name="full_name"
             value={profile?.full_name || ''}
-            class="w-full px-4 py-3 border border-platinum focus:border-gold-accent focus:ring-0 transition-colors bg-snow-white text-brand-black outline-none"
+            disabled={!!profile?.full_name}
+            required
+            class="w-full px-4 py-3 bg-platinum/30 border border-platinum focus:border-gold-accent focus:ring-0 transition-colors text-brand-black outline-none rounded-md disabled:text-brand-black/50 disabled:cursor-not-allowed"
             placeholder="Enter your name"
           />
         </div>
 
         <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="date_of_birth" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Date of Birth / 出生日期</label>
+            <input
+              type="date"
+              id="date_of_birth"
+              name="date_of_birth"
+              value={profile?.date_of_birth || ''}
+              disabled={!!profile?.date_of_birth}
+              required
+              class="w-full px-4 py-3 bg-platinum/30 border border-platinum focus:border-gold-accent outline-none text-brand-black transition-colors rounded-md disabled:text-brand-black/50 disabled:cursor-not-allowed"
+            />
+          </div>
           <div>
             <label for="phone" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Phone / 手机号</label>
             <input
@@ -109,37 +102,19 @@ const birthYears = Array.from({ length: currentYear - 1940 + 1 }, (_, i) => curr
               id="phone"
               name="phone"
               value={profile?.phone || ''}
+              required
               class="w-full px-4 py-3 border border-platinum focus:border-gold-accent outline-none bg-snow-white transition-colors"
             />
-          </div>
-          <div>
-            <label for="gender" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Gender / 性别</label>
-            <select id="gender" name="gender" class="w-full px-4 py-3 border border-platinum focus:border-gold-accent outline-none bg-snow-white transition-colors">
-              <option value="">Select</option>
-              <option value="Male" selected={profile?.gender === 'Male'}>Male</option>
-              <option value="Female" selected={profile?.gender === 'Female'}>Female</option>
-              <option value="Other" selected={profile?.gender === 'Other'}>Other</option>
-            </select>
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label for="birth_year" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Birth Year / 出生年</label>
-            <select
-              id="birth_year"
-              name="birth_year"
-              class="w-full px-4 py-3 border border-platinum focus:border-gold-accent outline-none bg-snow-white transition-colors"
-            >
-              <option value="">Select Year</option>
-              {birthYears.map((year) => (
-                <option 
-                  value={year} 
-                  selected={profile?.birth_year ? profile.birth_year === year : year === 2000}
-                >
-                  {year}
-                </option>
-              ))}
+            <label for="gender" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Gender / 性别 (Locked)</label>
+            <select id="gender" name="gender" disabled={!!profile?.gender} required class="w-full px-4 py-3 bg-platinum/30 border border-platinum focus:border-gold-accent outline-none text-brand-black transition-colors rounded-md disabled:text-brand-black/50 disabled:cursor-not-allowed">
+              <option value="">Select</option>
+              <option value="Male" selected={profile?.gender === 'Male'}>Male</option>
+              <option value="Female" selected={profile?.gender === 'Female'}>Female</option>
             </select>
           </div>
           <div>
@@ -153,6 +128,91 @@ const birthYears = Array.from({ length: currentYear - 1940 + 1 }, (_, i) => curr
           </div>
         </div>
 
+        <!-- 监护人信息部分 (仅对未成年人可见) -->
+        <div id="guardian-section" class="hidden border-t border-gold-accent/20 pt-6 mt-6 bg-gold-accent/5 p-4 rounded-lg">
+          <h3 class="text-xs uppercase tracking-[0.2em] font-bold text-brand-black mb-4 flex items-center">
+            <span class="bg-gold-accent w-2 h-2 rounded-full mr-2"></span>
+            Guardian Information / 监护人信息
+          </h3>
+          <div class="space-y-4">
+            <div>
+              <label for="guardian_name" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Guardian Name / 监护人全名</label>
+              <input
+                type="text"
+                id="guardian_name"
+                name="guardian_name"
+                value={profile?.guardian_name || ''}
+                class="w-full px-4 py-3 border border-platinum focus:border-gold-accent outline-none bg-snow-white transition-colors"
+                placeholder="Enter guardian's full name"
+              />
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label for="guardian_phone" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Guardian Phone</label>
+                <input type="tel" id="guardian_phone" name="guardian_phone" value={profile?.guardian_phone || ''} class="w-full px-4 py-3 border border-platinum outline-none bg-snow-white focus:border-gold-accent" />
+              </div>
+              <div>
+                <label for="guardian_email" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Guardian Email</label>
+                <input type="email" id="guardian_email" name="guardian_email" value={profile?.guardian_email || ''} class="w-full px-4 py-3 border border-platinum outline-none bg-snow-white focus:border-gold-accent" />
+              </div>
+            </div>
+            <div>
+              <label for="guardian_signature" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Guardian Signature / 监护人签名</label>
+              <div class="flex gap-2">
+                <input
+                  type="text"
+                  id="guardian_signature"
+                  name="guardian_signature"
+                  value={profile?.guardian_signature_name || ''}
+                  class="flex-1 px-4 py-3 border border-platinum border-dashed focus:border-gold-accent outline-none bg-snow-white transition-colors font-serif italic"
+                  placeholder="Guardian types name to sign"
+                />
+                <button type="button" id="copy-guardian-btn" class="px-4 py-2 border border-platinum text-[10px] uppercase tracking-widest font-bold hover:bg-platinum transition-colors whitespace-nowrap">Copy Name</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-platinum pt-6 mt-6">
+          <h3 class="text-xs uppercase tracking-[0.2em] font-bold text-brand-black mb-4">Emergency Contact / 紧急联系人</h3>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label for="emergency_contact_name" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Name / 姓名</label>
+              <input
+                type="text"
+                id="emergency_contact_name"
+                name="emergency_contact_name"
+                value={profile?.emergency_contact_name || ''}
+                required
+                class="w-full px-4 py-3 border border-platinum focus:border-gold-accent outline-none bg-snow-white transition-colors"
+              />
+            </div>
+            <div>
+              <label for="emergency_contact_phone" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Phone / 电话</label>
+              <input
+                type="tel"
+                id="emergency_contact_phone"
+                name="emergency_contact_phone"
+                value={profile?.emergency_contact_phone || ''}
+                required
+                class="w-full px-4 py-3 border border-platinum focus:border-gold-accent outline-none bg-snow-white transition-colors"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label for="medical_conditions" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Medical Conditions / 健康状况 (如无请填“无”)</label>
+          <textarea
+            id="medical_conditions"
+            name="medical_conditions"
+            rows="2"
+            required
+            class="w-full px-4 py-3 border border-platinum focus:border-gold-accent outline-none bg-snow-white transition-colors resize-y"
+            placeholder="Any allergies or medical conditions? (Type 'None' if none)"
+          >{profile?.medical_conditions || ''}</textarea>
+        </div>
+
         <div>
           <label for="bio" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Bio / 个人简介</label>
           <textarea
@@ -163,6 +223,24 @@ const birthYears = Array.from({ length: currentYear - 1940 + 1 }, (_, i) => curr
             placeholder="Tell us a bit about yourself and your skiing passion..."
           >{profile?.bio || ''}</textarea>
         </div>
+
+        <div id="signature-section" class="pt-6 border-t border-platinum">
+          <label for="signature" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Electronic Signature / 电子签名 (确认全名)</label>
+          <div class="flex gap-2">
+            <input
+              type="text"
+              id="signature"
+              name="signature"
+              class="flex-1 px-4 py-3 border border-platinum focus:border-gold-accent outline-none bg-snow-white transition-colors"
+              placeholder="Type your name to confirm"
+            />
+            <button type="button" id="copy-name-btn" class="px-4 py-2 border border-platinum text-[10px] uppercase tracking-widest font-bold hover:bg-platinum transition-colors">Copy Name</button>
+          </div>
+        </div>
+
+        { (profile?.full_name || profile?.date_of_birth) && (
+          <p class="text-[10px] text-brand-black/40 italic">Note: Identity fields (Name, DOB, Gender) are locked. Contact admin to change.</p>
+        )}
 
         <button type="submit" id="update-button" class="w-full bg-brand-black text-snow-white font-bold uppercase tracking-[0.2em] py-4 hover:bg-gold-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
           Update Profile
@@ -177,7 +255,7 @@ const birthYears = Array.from({ length: currentYear - 1940 + 1 }, (_, i) => curr
             myRegistrations.map((reg) => (
               <div class="bg-white border border-platinum p-6 rounded-lg shadow-sm flex justify-between items-center group hover:border-brand-blue transition-colors duration-300">
                 <div>
-                  <h3 class="font-serif text-xl text-brand-blue uppercase tracking-tight group-hover:text-brand-blue transition-colors">{reg.activities?.title || '未知活动 / Activity Removed'}</h3>
+                  <h3 class="font-serif text-xl text-brand-blue uppercase tracking-tight group-hover:text-brand-blue transition-colors">{reg.activities?.title || '未知活动'}</h3>
                   <p class="text-sm text-brand-blue/60 mt-1">{reg.activities?.date || 'N/A'} · {reg.activities?.location || 'N/A'}</p>
                 </div>
                 <div class="text-right flex items-center space-x-6">
@@ -218,102 +296,136 @@ const birthYears = Array.from({ length: currentYear - 1940 + 1 }, (_, i) => curr
 <script>
   import { supabase } from '../lib/supabase';
 
+  // 1. 获取所有 DOM 元素
   const form = document.getElementById('profile-form') as HTMLFormElement;
   const updateBtn = document.getElementById('update-button') as HTMLButtonElement;
+  const dobInput = document.getElementById('date_of_birth') as HTMLInputElement;
+  const guardianSection = document.getElementById('guardian-section');
+  const signatureSection = document.getElementById('signature-section');
   const toast = document.getElementById('toast');
   const toastMessage = document.getElementById('toast-message');
   const iconSuccess = document.getElementById('toast-icon-success');
   const iconError = document.getElementById('toast-icon-error');
 
+  // 2. 辅助函数
   function showToast(message: string, isError = false) {
     if (!toast || !toastMessage || !iconSuccess || !iconError) return;
-    
     toastMessage.textContent = message;
-    
-    // 根据状态切换背景颜色和图标
     toast.classList.toggle('bg-red-600/90', isError);
-    toast.classList.toggle('bg-red-500/90', false); // 清除旧的颜色类
     toast.classList.toggle('bg-brand-blue/90', !isError);
     iconSuccess.classList.toggle('hidden', isError);
     iconError.classList.toggle('hidden', !isError);
-
-    // 进场动画
     toast.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
     toast.classList.add('opacity-100', 'translate-y-0');
-
-    // 3秒后自动消失（如果页面没刷新）
     setTimeout(() => {
       toast.classList.remove('opacity-100', 'translate-y-0');
       toast.classList.add('opacity-0', 'translate-y-10', 'pointer-events-none');
     }, 3000);
   }
-  
+
+  function calculateAge(dobString: string) {
+    if (!dobString) return null;
+    const today = new Date();
+    const birthDate = new Date(dobString);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+    return age;
+  }
+
+  function toggleGuardianSection() {
+    if (!dobInput || !guardianSection || !signatureSection) return;
+    const age = calculateAge(dobInput.value);
+    if (age !== null && age < 18) {
+      guardianSection.classList.remove('hidden');
+      signatureSection.classList.remove('hidden');
+    } else {
+      guardianSection.classList.add('hidden');
+      signatureSection.classList.add('hidden');
+    }
+  }
+
+  // 3. 初始化监听器
+  dobInput?.addEventListener('change', toggleGuardianSection);
+  toggleGuardianSection();
+
+  document.getElementById('copy-name-btn')?.addEventListener('click', () => {
+    const fullNameInput = document.getElementById('full_name') as HTMLInputElement;
+    const sigInput = document.getElementById('signature') as HTMLInputElement;
+    if (fullNameInput && sigInput) sigInput.value = fullNameInput.value;
+  });
+
+  document.getElementById('copy-guardian-btn')?.addEventListener('click', () => {
+    const gNameInput = document.getElementById('guardian_name') as HTMLInputElement;
+    const gSigInput = document.getElementById('guardian_signature') as HTMLInputElement;
+    if (gNameInput && gSigInput) gSigInput.value = gNameInput.value;
+  });
+
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
-
-    if (updateBtn) {
-      updateBtn.disabled = true;
-      updateBtn.textContent = 'Saving... / 保存中...';
-    }
-    
     const formData = new FormData(form);
+    const fullNameInput = document.getElementById('full_name') as HTMLInputElement;
+    const dobInput = document.getElementById('date_of_birth') as HTMLInputElement;
+    const genderInput = document.getElementById('gender') as HTMLSelectElement;
+    
+    const fullName = fullNameInput.value.trim();
+    const dob = dobInput.value;
+    const signature = (formData.get('signature') as string)?.trim();
+    const age = calculateAge(dob);
 
-    // 定义内部接口以确保更新对象的类型安全
-    interface ProfileUpdate extends Omit<Profile, 'user_id'> {
-      user_id?: string;
+    if (age !== null && age < 18) {
+      if (signature !== fullName) {
+        showToast('Signature must match your name exactly.', true);
+        return;
+      }
+      if (!formData.get('guardian_name') || !formData.get('guardian_signature')) {
+        showToast('Guardian info and signature required for minors.', true);
+        return;
+      }
     }
 
-    const birthYearValue = formData.get('birth_year');
-    
-    const updates: Profile = {
-      user_id: (await supabase.auth.getUser()).data.user?.id as string,
-      full_name: (formData.get('full_name') as string) || null,
+    if (updateBtn) { updateBtn.disabled = true; updateBtn.textContent = 'Saving...'; }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const updates = {
+      user_id: user.id,
+      full_name: fullName || null,
+      date_of_birth: dob || null,
+      gender: genderInput.value || null,
       phone: (formData.get('phone') as string) || null,
-      gender: (formData.get('gender') as string) || null,
-      birth_year: birthYearValue ? parseInt(birthYearValue as string) : null,
       skill_level: (formData.get('skill_level') as string) || null,
       bio: (formData.get('bio') as string) || null,
+      medical_conditions: (formData.get('medical_conditions') as string) || null,
+      emergency_contact_name: (formData.get('emergency_contact_name') as string) || null,
+      emergency_contact_phone: (formData.get('emergency_contact_phone') as string) || null,
+      member_signature_name: signature,
+      guardian_name: (formData.get('guardian_name') as string) || null,
+      guardian_signature_name: (formData.get('guardian_signature') as string) || null,
+      guardian_email: (formData.get('guardian_email') as string) || null,
+      guardian_phone: (formData.get('guardian_phone') as string) || null,
+      updated_at: new Date().toISOString(),
     };
 
     const { error } = await supabase.from('profiles').upsert(updates, { onConflict: 'user_id' });
 
     if (error) {
       showToast(error.message, true);
-      if (updateBtn) {
-        updateBtn.disabled = false;
-        updateBtn.textContent = 'Update Profile';
-      }
+      if (updateBtn) { updateBtn.disabled = false; updateBtn.textContent = 'Update Profile'; }
     } else {
-      showToast('Profile updated successfully! / 个人资料更新成功！');
-      // 延迟刷新，让用户看一眼 Toast
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      showToast('Profile updated successfully!');
+      setTimeout(() => window.location.reload(), 1000);
     }
   });
 
-  // 处理取消报名逻辑
-  const cancelButtons = document.querySelectorAll('.cancel-reg-btn');
-  cancelButtons.forEach(btn => {
+  document.querySelectorAll('.cancel-reg-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const regId = btn.getAttribute('data-id');
-      if (!regId) return;
-
-      const confirmed = confirm('Are you sure you want to cancel this registration? / 确定要取消这项报名吗？');
-      if (confirmed) {
-        const { error } = await supabase
-          .from('registrations')
-          .delete()
-          .eq('id', regId);
-
-        if (error) {
-          showToast('Failed to cancel / 取消失败: ' + error.message, true);
-        } else {
-          showToast('Registration cancelled. / 报名已取消。');
-          setTimeout(() => {
-            window.location.reload();
-          }, 800);
-        }
+      if (regId && confirm('Confirm cancellation?')) {
+        const { error } = await supabase.from('registrations').delete().eq('id', regId);
+        if (error) showToast(error.message, true);
+        else { showToast('Cancelled.'); setTimeout(() => window.location.reload(), 800); }
       }
     });
   });

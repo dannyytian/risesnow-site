@@ -6,52 +6,75 @@ let errorMessage: string | null = null;
 ---
 
 <MainLayout title="Register - RiseSnow Club">
-  <main class="min-h-screen flex items-center justify-center bg-bg-light text-brand-blue p-4 pt-20">
-    <div class="w-full max-w-md bg-white rounded-lg shadow-2xl p-8 border-t-4 border-brand-blue">
+  <main class="min-h-screen flex items-center justify-center bg-bg-light text-brand-blue p-4 pt-32 pb-20">
+    <div class="w-full max-w-2xl bg-white rounded-lg shadow-2xl p-8 border-t-4 border-brand-blue">
       <h2 class="font-serif text-3xl text-center uppercase tracking-widest text-brand-blue mb-8">Register / 注册</h2>
       
       <form id="register-form" class="space-y-6">
-        <div>
-          <label for="full_name" class="block text-sm font-semibold text-brand-blue/60 uppercase tracking-wider mb-2">Full Name</label>
-          <input
-            type="text"
-            id="full_name"
-            name="full_name"
-            required
-            class="w-full px-4 py-3 rounded-md bg-bg-light border border-platinum focus:border-brand-blue focus:ring-1 focus:ring-brand-blue text-brand-blue outline-none transition-colors duration-200"
-            placeholder="Your Full Name"
-          />
+        <!-- 账户信息 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-b border-platinum pb-6">
+          <div class="col-span-full text-[10px] uppercase font-bold tracking-widest text-brand-blue/40">Account Settings</div>
+          <div>
+            <label for="email" class="block text-xs font-semibold text-brand-blue/60 uppercase tracking-wider mb-2">Email / 邮箱</label>
+            <input type="email" id="email" name="email" required class="w-full px-4 py-3 rounded-md bg-bg-light border border-platinum focus:border-brand-blue outline-none transition-all" placeholder="your@email.com" />
+          </div>
+          <div>
+            <label for="password" class="block text-xs font-semibold text-brand-blue/60 uppercase tracking-wider mb-2">Password / 密码</label>
+            <input type="password" id="password" name="password" required minlength="6" class="w-full px-4 py-3 rounded-md bg-bg-light border border-platinum focus:border-brand-blue outline-none transition-all" placeholder="••••••••" />
+          </div>
         </div>
-        <div>
-          <label for="email" class="block text-sm font-semibold text-brand-blue/60 uppercase tracking-wider mb-2">Email Address</label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            required
-            class="w-full px-4 py-3 rounded-md bg-bg-light border border-platinum focus:border-brand-blue focus:ring-1 focus:ring-brand-blue text-brand-blue outline-none transition-colors duration-200"
-            placeholder="your@email.com"
-          />
+
+        <!-- 身份资料 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="col-span-full text-[10px] uppercase font-bold tracking-widest text-brand-blue/40">Profile Information</div>
+          <div class="col-span-full">
+            <label for="full_name" class="block text-xs font-semibold text-brand-blue/60 uppercase tracking-wider mb-2">Full Name / 全名</label>
+            <input type="text" id="full_name" name="full_name" required class="w-full px-4 py-3 rounded-md bg-bg-light border border-platinum focus:border-brand-blue outline-none" placeholder="Legal Full Name" />
+          </div>
+          <div>
+            <label for="date_of_birth" class="block text-xs font-semibold text-brand-blue/60 uppercase tracking-wider mb-2">Date of Birth / 生日</label>
+            <input type="date" id="date_of_birth" name="date_of_birth" required class="w-full px-4 py-3 rounded-md bg-bg-light border border-platinum focus:border-brand-blue outline-none" />
+          </div>
+          <div>
+            <label for="gender" class="block text-xs font-semibold text-brand-blue/60 uppercase tracking-wider mb-2">Gender / 性别</label>
+            <select id="gender" name="gender" required class="w-full px-4 py-3 rounded-md bg-bg-light border border-platinum focus:border-brand-blue outline-none">
+              <option value="">Select</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+          </div>
         </div>
-        <div>
-          <label for="password" class="block text-sm font-semibold text-brand-blue/60 uppercase tracking-wider mb-2">Password</label>
-          <input
-            type="password"
-            id="password"
-            name="password"
-            required
-            class="w-full px-4 py-3 rounded-md bg-bg-light border border-platinum focus:border-brand-blue focus:ring-1 focus:ring-brand-blue text-brand-blue outline-none transition-colors duration-200"
-            placeholder="••••••••"
-          />
+
+        <!-- 监护人区块 (未成年人可见) -->
+        <div id="guardian-section" class="hidden border-t-2 border-accent-yellow/20 pt-6 mt-6 bg-accent-yellow/5 p-6 rounded-lg space-y-4">
+          <div class="text-[10px] uppercase font-bold tracking-widest text-accent-yellow">Guardian Consent Required</div>
+          <div>
+            <label for="guardian_name" class="block text-xs font-semibold text-brand-blue mb-2">Guardian Name / 监护人姓名</label>
+            <input type="text" id="guardian_name" name="guardian_name" class="w-full px-4 py-3 rounded-md border border-platinum focus:border-brand-blue outline-none" />
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label for="guardian_phone" class="block text-[10px] text-brand-blue/40 uppercase mb-1">Guardian Phone</label>
+              <input type="tel" id="guardian_phone" name="guardian_phone" class="w-full px-4 py-3 rounded-md border border-platinum outline-none" />
+            </div>
+            <div>
+              <label for="guardian_email" class="block text-[10px] text-brand-blue/40 uppercase mb-1">Guardian Email</label>
+              <input type="email" id="guardian_email" name="guardian_email" class="w-full px-4 py-3 rounded-md border border-platinum outline-none" />
+            </div>
+          </div>
+          <div>
+            <label for="guardian_signature" class="block text-xs font-semibold text-brand-blue mb-2 font-serif italic">Parent or Guardian Electronic Signature / 家长或监护人电子签名</label>
+            <div class="flex gap-2">
+              <input type="text" id="guardian_signature" name="guardian_signature" placeholder="Type Parent/Guardian's full name" class="flex-1 px-4 py-3 rounded-md border border-platinum border-dashed focus:border-brand-blue outline-none font-serif italic bg-transparent" />
+              <button type="button" id="copy-guardian-name-btn" class="px-4 py-2 border border-platinum text-[10px] uppercase tracking-widest font-bold hover:bg-platinum transition-colors whitespace-nowrap">Copy Name</button>
+            </div>
+          </div>
         </div>
         
         <p id="error-message" class="text-red-500 text-sm text-center hidden font-medium"></p>
 
-        <button
-          type="submit"
-          class="w-full bg-brand-blue text-white font-bold uppercase tracking-widest py-3 rounded-md hover:bg-opacity-90 transition-all duration-200 shadow-md"
-        >
-          Sign Up
+        <button type="submit" id="submit-btn" class="w-full bg-brand-blue text-white font-bold uppercase tracking-widest py-4 rounded-md hover:bg-opacity-90 transition-all duration-200 shadow-md">
+          Complete Registration
         </button>
       </form>
 
@@ -65,40 +88,102 @@ let errorMessage: string | null = null;
 <script>
   import { supabase } from '../lib/supabase'; // Client-side import
 
-  const form = document.getElementById('register-form');
-  const emailInput = document.getElementById('email');
-  const passwordInput = document.getElementById('password');
-  const fullNameInput = document.getElementById('full_name');
-  const errorDisplay = document.getElementById('error-message');
+  const form = document.getElementById('register-form') as HTMLFormElement;
+  const dobInput = document.getElementById('date_of_birth') as HTMLInputElement;
+  const guardianSection = document.getElementById('guardian-section');
+  const errorDisplay = document.getElementById('error-message') as HTMLElement;
+  const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+
+  function calculateAge(dobString: string) {
+    if (!dobString) return null;
+    const today = new Date();
+    const birthDate = new Date(dobString);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+    return age;
+  }
+
+  dobInput?.addEventListener('change', () => {
+    const age = calculateAge(dobInput.value);
+    if (age !== null && age < 18) {
+      guardianSection?.classList.remove('hidden');
+    } else {
+      guardianSection?.classList.add('hidden');
+    }
+  });
+
+  document.getElementById('copy-guardian-name-btn')?.addEventListener('click', () => {
+    const guardianNameInput = document.getElementById('guardian_name') as HTMLInputElement;
+    const guardianSigInput = document.getElementById('guardian_signature') as HTMLInputElement;
+    if (guardianNameInput && guardianSigInput) {
+      guardianSigInput.value = guardianNameInput.value;
+    }
+  });
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const fullName = fullNameInput.value;
-    const email = emailInput.value;
-    const password = passwordInput.value;
+    const formData = new FormData(form);
     errorDisplay.classList.add('hidden');
+    
+    const fullName = (formData.get('full_name') as string).trim();
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+    const dob = formData.get('date_of_birth') as string;
+    const age = calculateAge(dob);
+
+    // 1. 未成年人合规校验 (监护人姓名与签名必填)
+    if (age !== null && age < 18) {
+      const guardianName = (formData.get('guardian_name') as string)?.trim();
+      const guardianSig = (formData.get('guardian_signature') as string)?.trim();
+
+      if (!guardianName || !guardianSig) {
+        errorDisplay.textContent = "Guardian name and signature are required for minors. / 未成年人需填写监护人信息及签名。";
+        errorDisplay.classList.remove('hidden');
+        return;
+      }
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Processing...';
 
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: {
-          full_name: fullName, // Pass full_name to user_metadata
-        },
-      },
+      options: { data: { full_name: fullName } },
     });
 
     if (error) {
       errorDisplay.textContent = error.message;
       errorDisplay.classList.remove('hidden');
-    } else if (data.session) {
-      // If registration is successful and a session is returned, send to Astro API to set cookies
-      await fetch('/api/set-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event: 'SIGNED_IN', session: data.session }),
-      });
-      window.location.assign('/profile'); 
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Join Club';
+      return;
+    }
+
+    if (data.user) {
+      // 3. 创建 Profile 记录
+      const profileData = {
+        user_id: data.user.id,
+        full_name: fullName,
+        date_of_birth: dob,
+        gender: formData.get('gender'),
+        guardian_name: formData.get('guardian_name'),
+        guardian_signature_name: formData.get('guardian_signature'),
+        guardian_phone: formData.get('guardian_phone'),
+        guardian_email: formData.get('guardian_email'),
+        updated_at: new Date().toISOString()
+      };
+
+      const { error: profileError } = await supabase.from('profiles').insert([profileData]);
+
+      if (profileError) {
+        errorDisplay.textContent = "Account created, but profile failed: " + profileError.message;
+        errorDisplay.classList.remove('hidden');
+      } else {
+        alert('Registration successful! Please check your email to confirm.');
+        window.location.href = '/login';
+      }
     } else {
       alert('Registration successful! Please check your email to confirm your account.');
       window.location.href = '/login'; // Redirect to login page after successful registration

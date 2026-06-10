@@ -1,12 +1,17 @@
 ---
 import Navbar from '../components/Navbar.astro';
 import '../styles/global.css';
+import { getSupabaseClient } from '../lib/supabase';
 
 interface Props {
 	title: string;
 }
 
 const { title } = Astro.props;
+
+// 在服务端获取当前 Session
+const supabase = getSupabaseClient(Astro.cookies);
+const { data: { session } } = await supabase.auth.getSession();
 ---
 
 <!doctype html>
@@ -19,16 +24,29 @@ const { title } = Astro.props;
 	<body>
 		<Navbar />
 		<slot />
+    
+    <!-- 将 Session 数据安全地传递给客户端 -->
+    <script id="supabase-session" type="application/json" is:inline set:html={JSON.stringify(session)}></script>
 	</body>
 </html>
 
 <script>
   import { supabase } from '../lib/supabase';
 
+  // 1. 立即用水合数据初始化客户端 Session
+  const sessionElement = document.getElementById('supabase-session');
+  if (sessionElement && sessionElement.textContent) {
+    const session = JSON.parse(sessionElement.textContent);
+    if (session) {
+      await supabase.auth.setSession(session);
+    }
+  }
+
   // 监听身份验证状态变化 (在浏览器端运行)
   supabase.auth.onAuthStateChange(async (event, session) => {
     try {
-      if (event === 'SIGNED_OUT') {
+      // 只有在明确发生登出动作时才清理 Cookie
+      if (event === 'SIGNED_OUT' && !session) {
         // 情况 A: 用户主动登出或 Session 到期刷新失败
         // 同步清除服务器端 Cookie
         await fetch('/api/clear-session', { method: 'POST' });
