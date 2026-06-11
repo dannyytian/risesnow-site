@@ -70,10 +70,35 @@ let errorMessage: string | null = null;
             </div>
           </div>
         </div>
+
+        <!-- 签名区块 (仅对成年人可见) -->
+        <div id="adult-signature-section" class="hidden border-t-2 border-brand-blue/20 pt-6 mt-6 bg-brand-blue/5 p-6 rounded-lg space-y-4">
+          <label for="signature" class="block text-xs font-semibold text-brand-blue mb-2 font-serif italic">Electronic Signature / 电子签名 (确认全名)</label>
+          <div class="flex gap-2">
+            <input type="text" id="signature" name="signature" placeholder="Type your full name to confirm" class="flex-1 px-4 py-3 rounded-md border border-platinum border-dashed focus:border-brand-blue outline-none font-serif italic bg-transparent" />
+            <button type="button" id="copy-name-btn" class="px-4 py-2 border border-platinum text-[10px] uppercase tracking-widest font-bold hover:bg-platinum transition-colors whitespace-nowrap">Copy Name</button>
+          </div>
+        </div>
         
+        <!-- 法律协议勾选 -->
+        <div class="space-y-3 pt-4 border-t border-platinum">
+          <div class="flex items-start gap-3">
+            <input type="checkbox" id="agree-membership" class="mt-1 w-4 h-4 rounded border-platinum text-brand-blue focus:ring-brand-blue transition-all" />
+            <label for="agree-membership" class="text-[11px] text-brand-blue/70 leading-relaxed cursor-pointer select-none">
+              I have read and agree to the <a href="#" class="text-brand-blue font-bold hover:underline">Club Member Agreement</a> / 我已阅读并同意《俱乐部会员协议》
+            </label>
+          </div>
+          <div class="flex items-start gap-3">
+            <input type="checkbox" id="agree-disclaimer" class="mt-1 w-4 h-4 rounded border-platinum text-brand-blue focus:ring-brand-blue transition-all" />
+            <label for="agree-disclaimer" class="text-[11px] text-brand-blue/70 leading-relaxed cursor-pointer select-none">
+              I have read and agree to the <a href="#" class="text-brand-blue font-bold hover:underline">Disclaimer</a> / 我已阅读并同意《免责声明》
+            </label>
+          </div>
+        </div>
+
         <p id="error-message" class="text-red-500 text-sm text-center hidden font-medium"></p>
 
-        <button type="submit" id="submit-btn" class="w-full bg-brand-blue text-white font-bold uppercase tracking-widest py-4 rounded-md hover:bg-opacity-90 transition-all duration-200 shadow-md">
+        <button type="submit" id="submit-btn" disabled class="w-full bg-brand-blue text-white font-bold uppercase tracking-widest py-4 rounded-md hover:bg-opacity-90 transition-all duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed">
           Complete Registration
         </button>
       </form>
@@ -90,9 +115,18 @@ let errorMessage: string | null = null;
 
   const form = document.getElementById('register-form') as HTMLFormElement;
   const dobInput = document.getElementById('date_of_birth') as HTMLInputElement;
-  const guardianSection = document.getElementById('guardian-section');
+  const guardianSection = document.getElementById('guardian-section') as HTMLElement | null;
+  const adultSignatureSection = document.getElementById('adult-signature-section') as HTMLElement | null;
   const errorDisplay = document.getElementById('error-message') as HTMLElement;
   const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+
+  const membershipCheck = document.getElementById('agree-membership') as HTMLInputElement;
+  const disclaimerCheck = document.getElementById('agree-disclaimer') as HTMLInputElement;
+
+  // 联动逻辑：只有勾选了所有协议，才能点击提交
+  function updateSubmitState() {
+    submitBtn.disabled = !(membershipCheck?.checked && disclaimerCheck?.checked);
+  }
 
   function calculateAge(dobString: string) {
     if (!dobString) return null;
@@ -104,12 +138,22 @@ let errorMessage: string | null = null;
     return age;
   }
 
+  membershipCheck?.addEventListener('change', updateSubmitState);
+  disclaimerCheck?.addEventListener('change', updateSubmitState);
+  // 初始化状态
+  updateSubmitState();
+
   dobInput?.addEventListener('change', () => {
     const age = calculateAge(dobInput.value);
     if (age !== null && age < 18) {
       guardianSection?.classList.remove('hidden');
+      adultSignatureSection?.classList.add('hidden');
+    } else if (age !== null && age >= 18) {
+      guardianSection?.classList.add('hidden');
+      adultSignatureSection?.classList.remove('hidden');
     } else {
       guardianSection?.classList.add('hidden');
+      adultSignatureSection?.classList.add('hidden');
     }
   });
 
@@ -121,15 +165,38 @@ let errorMessage: string | null = null;
     }
   });
 
+  document.getElementById('copy-name-btn')?.addEventListener('click', () => {
+    const fullNameInput = document.getElementById('full_name') as HTMLInputElement;
+    const sigInput = document.getElementById('signature') as HTMLInputElement;
+    if (fullNameInput && sigInput) {
+      sigInput.value = fullNameInput.value;
+    }
+  });
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const formData = new FormData(form);
     errorDisplay.classList.add('hidden');
     
-    const fullName = (formData.get('full_name') as string).trim();
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
+    // 1. Data Sanitization and Basic Validation
+    const fullName = (formData.get('full_name') as string || '').trim();
+    const email = (formData.get('email') as string || '').trim().toLowerCase();
+    const password = formData.get('password') as string || '';
     const dob = formData.get('date_of_birth') as string;
+
+    if (fullName.length < 2 || fullName.length > 100) {
+      errorDisplay.textContent = "Please enter a valid full name (2-100 characters).";
+      errorDisplay.classList.remove('hidden');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      errorDisplay.textContent = "Please enter a valid email address.";
+      errorDisplay.classList.remove('hidden');
+      return;
+    }
+
     const age = calculateAge(dob);
 
     // 1. 未成年人合规校验 (监护人姓名与签名必填)
@@ -144,19 +211,41 @@ let errorMessage: string | null = null;
       }
     }
 
+    // 2. 成年人合规校验 (个人签名必填且需匹配)
+    if (age !== null && age >= 18) {
+      const signature = (formData.get('signature') as string)?.trim();
+      if (!signature || signature !== fullName) {
+        errorDisplay.textContent = "Please sign your full name exactly to confirm. / 请输入与全名一致的电子签名。";
+        errorDisplay.classList.remove('hidden');
+        return;
+      }
+    }
+
     submitBtn.disabled = true;
     submitBtn.textContent = 'Processing...';
 
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: { 
+        data: { 
+          full_name: fullName,
+          date_of_birth: dob,
+          gender: formData.get('gender') as string,
+          member_signature_name: (formData.get('signature') as string)?.trim() || null,
+          guardian_name: (formData.get('guardian_name') as string)?.trim() || null,
+          guardian_signature_name: (formData.get('guardian_signature') as string)?.trim() || null,
+          guardian_phone: (formData.get('guardian_phone') as string)?.trim() || null,
+          guardian_email: (formData.get('guardian_email') as string)?.trim() || null,
+        } 
+      },
     });
 
     if (error) {
       errorDisplay.textContent = error.message;
       errorDisplay.classList.remove('hidden');
       submitBtn.disabled = false;
+      updateSubmitState();
       submitBtn.textContent = 'Join Club';
       return;
     }
@@ -167,11 +256,12 @@ let errorMessage: string | null = null;
         user_id: data.user.id,
         full_name: fullName,
         date_of_birth: dob,
-        gender: formData.get('gender'),
-        guardian_name: formData.get('guardian_name'),
-        guardian_signature_name: formData.get('guardian_signature'),
-        guardian_phone: formData.get('guardian_phone'),
-        guardian_email: formData.get('guardian_email'),
+        gender: formData.get('gender') as string,
+        member_signature_name: (formData.get('signature') as string)?.trim() || null,
+        guardian_name: (formData.get('guardian_name') as string)?.trim() || null,
+        guardian_signature_name: (formData.get('guardian_signature') as string)?.trim() || null,
+        guardian_phone: (formData.get('guardian_phone') as string)?.trim() || null,
+        guardian_email: (formData.get('guardian_email') as string)?.trim() || null,
         updated_at: new Date().toISOString()
       };
 
@@ -181,6 +271,13 @@ let errorMessage: string | null = null;
         errorDisplay.textContent = "Account created, but profile failed: " + profileError.message;
         errorDisplay.classList.remove('hidden');
       } else {
+        // 4. 记录法律协议签署
+        const agreements = [
+          { user_id: data.user.id, agreement_type: 'membership_agreement', version: '1.0' },
+          { user_id: data.user.id, agreement_type: 'disclaimer', version: '1.0' }
+        ];
+        await supabase.from('legal_agreements').insert(agreements);
+
         alert('Registration successful! Please check your email to confirm.');
         window.location.href = '/login';
       }

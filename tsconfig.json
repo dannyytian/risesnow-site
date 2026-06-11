@@ -1,6 +1,8 @@
 {
   "extends": "astro/tsconfigs/base",
   "include": [
-    "./worker-configuration.d.ts"
+    "./worker-configuration.d.ts",
+    "./src/**/*", // 包含 src 目录下所有文件
+    "./src/env.d.ts" // 明确包含 env.d.ts
   ]
 }

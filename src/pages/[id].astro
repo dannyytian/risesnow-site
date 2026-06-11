@@ -100,14 +100,27 @@ const isProfileIncomplete = !profile?.full_name ||
                 </label>
               </div>
               <div>
-                <label class="block text-[10px] uppercase font-bold mb-2">Guardian Full Name / 监护人全名</label>
-                <input 
-                  type="text" 
-                  name="guardian_signature" 
-                  required={isMinor}
-                  class="w-full px-4 py-3 border border-platinum focus:border-gold-accent outline-none font-serif italic" 
-                  placeholder="Type your name to sign"
+                <label for="guardian_name" class="block text-[10px] uppercase font-bold mb-2">Guardian Name / 监护人姓名</label>
+                <input
+                  type="text"
+                  id="guardian_name"
+                  name="guardian_name"
+                  value={profile?.guardian_name || ''}
+                  class="w-full px-4 py-3 border border-platinum focus:border-gold-accent outline-none mb-4"
+                  placeholder="Enter guardian's full name"
                 />
+
+                <label for="guardian_signature" class="block text-[10px] uppercase font-bold mb-2 font-serif italic">Guardian Electronic Signature / 监护人电子签名</label>
+                <div class="flex gap-2">
+                  <input 
+                    type="text" 
+                    id="guardian_signature"
+                    name="guardian_signature" 
+                    class="flex-1 px-4 py-3 border border-platinum border-dashed focus:border-gold-accent outline-none font-serif italic bg-snow-white" 
+                    placeholder="Guardian types name to sign"
+                  />
+                  <button type="button" id="copy-guardian-btn" class="px-4 py-2 border border-platinum text-[10px] uppercase tracking-widest font-bold hover:bg-platinum transition-colors whitespace-nowrap">Copy Name</button>
+                </div>
               </div>
             </div>
           </section>
@@ -148,6 +161,14 @@ const isProfileIncomplete = !profile?.full_name ||
   const submitBtn = document.getElementById('reg-submit-btn') as HTMLButtonElement;
   const expectedName = form?.dataset.expectedName;
 
+  document.getElementById('copy-guardian-btn')?.addEventListener('click', () => {
+    const gNameInput = document.getElementById('guardian_name') as HTMLInputElement;
+    const gSigInput = document.getElementById('guardian_signature') as HTMLInputElement;
+    if (gNameInput && gSigInput) {
+      gSigInput.value = gNameInput.value;
+    }
+  });
+
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const formData = new FormData(form);
@@ -157,6 +178,23 @@ const isProfileIncomplete = !profile?.full_name ||
     if (signature !== expectedName) {
       alert(`Signature must match your full name: ${expectedName}`);
       return;
+    }
+
+    // 未成年人监护人校验
+    const minorBlock = document.getElementById('minor-consent-block');
+    if (minorBlock) {
+      const guardianName = (formData.get('guardian_name') as string)?.trim();
+      const guardianSig = (formData.get('guardian_signature') as string)?.trim();
+
+      if (!guardianName || !guardianSig) {
+        alert('Guardian name and signature are required for minors.');
+        return;
+      }
+
+      if (guardianSig !== guardianName) {
+        alert(`Guardian signature must match guardian name: ${guardianName}`);
+        return;
+      }
     }
 
     // 2. 状态反馈

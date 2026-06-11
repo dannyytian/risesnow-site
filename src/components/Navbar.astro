@@ -1,32 +1,18 @@
 ---
 import { getSupabaseClient } from '../lib/supabase';
 
-// For server-side rendering (SSR) in Astro, we need to pass the request's cookies
-// to the Supabase client so it can detect the session.
+// 从 Astro.locals 获取 user 和 session
+const user = Astro.locals.user;
+let userName = user?.user_metadata?.full_name || user?.email || 'Member';
 
-let user = (Astro.locals as any).user || null;
-let profileName = null;
-const serverSupabase = getSupabaseClient(Astro.cookies);
-
-// 只有在没有重定向发生时才尝试获取用户数据。
-// 这可以防止在响应已发送后尝试设置 Cookie。
-if (!user && !Astro.response.headers.has('Location')) {
-  const { data: userData } = await serverSupabase.auth.getUser();
-  user = userData?.user;
+// 如果 user 存在，尝试从 profiles 表获取 full_name
+if (user) {
+  const serverSupabase = getSupabaseClient(Astro.cookies); // 仍然需要客户端来查询 profiles
+  const { data: profile } = await serverSupabase.from('profiles').select('full_name').eq('user_id', user.id).maybeSingle();
+  if (profile?.full_name) {
+    userName = profile.full_name;
+  }
 }
-
-// 独立出获取 Profile 姓名的逻辑，确保无论 user 来源如何都能运行
-if (user && !profileName) {
-  const { data: profile } = await serverSupabase
-    .from('profiles')
-    .select('full_name')
-    .eq('user_id', user.id)
-    .single();
-  profileName = profile?.full_name;
-}
-
-// 优先级：数据库姓名 > Auth元数据 > 邮箱
-const userName = profileName || user?.user_metadata?.full_name || user?.email || 'Member';
 ---
 
  <nav class="fixed top-0 w-full z-50 px-8 py-2 flex justify-between items-center bg-white shadow-sm border-b border-platinum text-brand-blue transition-all duration-300 font-sans">

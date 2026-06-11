@@ -5,14 +5,12 @@ import { getSupabaseClient } from '../lib/supabase';
 import type { Profile, RegistrationWithActivity } from '../types/database';
 
 const supabase = getSupabaseClient(Astro.cookies);
-const { data, error } = await supabase.auth.getUser();
-const user = data?.user;
+// 从 Middleware 获取 user 和 session
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (user) (Astro.locals as any).user = user;
-
-if (error || !user) {
-  return Astro.redirect('/login');
-}
+// Middleware 已经处理了未登录重定向，这里只需确保 user 存在
+if (!user) return Astro.redirect('/login');
 
 // 业务逻辑：获取或创建 Profile
 let { data: profileData, error: profileError } = await supabase
@@ -24,11 +22,19 @@ let { data: profileData, error: profileError } = await supabase
 let profile = profileData as unknown as Profile | null;
 
 if (!profile || (profileError && profileError.code === 'PGRST116')) {
+  // 如果 Profile 不存在，从 Auth 元数据中提取之前注册时填写的监护人信息
+  const metadata = user.user_metadata;
   const { data: newProfile, error: createError } = await supabase
     .from('profiles')
     .insert({
       user_id: user.id,
-      full_name: user.user_metadata?.full_name || '',
+      full_name: metadata?.full_name || '',
+      date_of_birth: metadata?.date_of_birth || null,
+      gender: metadata?.gender || null,
+      guardian_name: metadata?.guardian_name || null,
+      guardian_signature_name: metadata?.guardian_signature_name || null,
+      guardian_phone: metadata?.guardian_phone || null,
+      guardian_email: metadata?.guardian_email || null,
     })
     .select()
     .single();
@@ -53,8 +59,24 @@ const { data: registrationsData } = await supabase
 
 const myRegistrations = registrationsData as unknown as RegistrationWithActivity[] | null;
 
+// 辅助函数：计算年龄
+// ... (getServerAge function remains the same)
+function getServerAge(dobString: string | null | undefined) {
+  if (!dobString) return null;
+  const today = new Date();
+  const birthDate = new Date(dobString);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+  return age;
+}
+
 // 提取显示名称的统一逻辑：优先从数据库获取，其次从 Auth 元数据获取
 const displayName = profile?.full_name || user.user_metadata?.full_name || 'Valued Member';
+const dobForAgeCalculation = profile?.date_of_birth || user.user_metadata?.date_of_birth;
+const calculatedAge = getServerAge(dobForAgeCalculation);
+const isMinor = (calculatedAge ?? 0) < 18;
+
 ---
 
 <MainLayout title="Profile Settings - RiseSnow Club">
@@ -129,7 +151,7 @@ const displayName = profile?.full_name || user.user_metadata?.full_name || 'Valu
         </div>
 
         <!-- 监护人信息部分 (仅对未成年人可见) -->
-        <div id="guardian-section" class="hidden border-t border-gold-accent/20 pt-6 mt-6 bg-gold-accent/5 p-4 rounded-lg">
+        <div id="guardian-section" class={`border-t border-gold-accent/20 pt-6 mt-6 bg-gold-accent/5 p-4 rounded-lg ${isMinor ? '' : 'hidden'}`}>
           <h3 class="text-xs uppercase tracking-[0.2em] font-bold text-brand-black mb-4 flex items-center">
             <span class="bg-gold-accent w-2 h-2 rounded-full mr-2"></span>
             Guardian Information / 监护人信息
@@ -224,20 +246,6 @@ const displayName = profile?.full_name || user.user_metadata?.full_name || 'Valu
           >{profile?.bio || ''}</textarea>
         </div>
 
-        <div id="signature-section" class="pt-6 border-t border-platinum">
-          <label for="signature" class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black mb-2">Electronic Signature / 电子签名 (确认全名)</label>
-          <div class="flex gap-2">
-            <input
-              type="text"
-              id="signature"
-              name="signature"
-              class="flex-1 px-4 py-3 border border-platinum focus:border-gold-accent outline-none bg-snow-white transition-colors"
-              placeholder="Type your name to confirm"
-            />
-            <button type="button" id="copy-name-btn" class="px-4 py-2 border border-platinum text-[10px] uppercase tracking-widest font-bold hover:bg-platinum transition-colors">Copy Name</button>
-          </div>
-        </div>
-
         { (profile?.full_name || profile?.date_of_birth) && (
           <p class="text-[10px] text-brand-black/40 italic">Note: Identity fields (Name, DOB, Gender) are locked. Contact admin to change.</p>
         )}
@@ -300,21 +308,20 @@ const displayName = profile?.full_name || user.user_metadata?.full_name || 'Valu
   const form = document.getElementById('profile-form') as HTMLFormElement;
   const updateBtn = document.getElementById('update-button') as HTMLButtonElement;
   const dobInput = document.getElementById('date_of_birth') as HTMLInputElement;
-  const guardianSection = document.getElementById('guardian-section');
-  const signatureSection = document.getElementById('signature-section');
-  const toast = document.getElementById('toast');
-  const toastMessage = document.getElementById('toast-message');
-  const iconSuccess = document.getElementById('toast-icon-success');
-  const iconError = document.getElementById('toast-icon-error');
+  const guardianSection = document.getElementById('guardian-section') as HTMLElement | null;
+  const toast = document.getElementById('toast') as HTMLElement | null;
+  const toastMessage = document.getElementById('toast-message') as HTMLElement | null;
+  const iconSuccess = document.getElementById('toast-icon-success') as HTMLElement | null;
+  const iconError = document.getElementById('toast-icon-error') as HTMLElement | null;
 
   // 2. 辅助函数
   function showToast(message: string, isError = false) {
-    if (!toast || !toastMessage || !iconSuccess || !iconError) return;
+    if (!toast || !toastMessage) return;
     toastMessage.textContent = message;
     toast.classList.toggle('bg-red-600/90', isError);
     toast.classList.toggle('bg-brand-blue/90', !isError);
-    iconSuccess.classList.toggle('hidden', isError);
-    iconError.classList.toggle('hidden', !isError);
+    if (iconSuccess) iconSuccess.classList.toggle('hidden', isError);
+    if (iconError) iconError.classList.toggle('hidden', !isError);
     toast.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
     toast.classList.add('opacity-100', 'translate-y-0');
     setTimeout(() => {
@@ -334,26 +341,18 @@ const displayName = profile?.full_name || user.user_metadata?.full_name || 'Valu
   }
 
   function toggleGuardianSection() {
-    if (!dobInput || !guardianSection || !signatureSection) return;
+    if (!dobInput || !guardianSection) return;
     const age = calculateAge(dobInput.value);
     if (age !== null && age < 18) {
       guardianSection.classList.remove('hidden');
-      signatureSection.classList.remove('hidden');
     } else {
       guardianSection.classList.add('hidden');
-      signatureSection.classList.add('hidden');
     }
   }
 
   // 3. 初始化监听器
   dobInput?.addEventListener('change', toggleGuardianSection);
   toggleGuardianSection();
-
-  document.getElementById('copy-name-btn')?.addEventListener('click', () => {
-    const fullNameInput = document.getElementById('full_name') as HTMLInputElement;
-    const sigInput = document.getElementById('signature') as HTMLInputElement;
-    if (fullNameInput && sigInput) sigInput.value = fullNameInput.value;
-  });
 
   document.getElementById('copy-guardian-btn')?.addEventListener('click', () => {
     const gNameInput = document.getElementById('guardian_name') as HTMLInputElement;
@@ -370,14 +369,9 @@ const displayName = profile?.full_name || user.user_metadata?.full_name || 'Valu
     
     const fullName = fullNameInput.value.trim();
     const dob = dobInput.value;
-    const signature = (formData.get('signature') as string)?.trim();
     const age = calculateAge(dob);
 
     if (age !== null && age < 18) {
-      if (signature !== fullName) {
-        showToast('Signature must match your name exactly.', true);
-        return;
-      }
       if (!formData.get('guardian_name') || !formData.get('guardian_signature')) {
         showToast('Guardian info and signature required for minors.', true);
         return;
@@ -389,22 +383,32 @@ const displayName = profile?.full_name || user.user_metadata?.full_name || 'Valu
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // Helper to sanitize text input
+    const getClean = (key: string) => (formData.get(key) as string || '').trim().slice(0, 1000) || null;
+
+    const phoneRegex = /^[\d\s\-\+\(\)]{7,20}$/;
+    const phone = getClean('phone');
+    if (phone && !phoneRegex.test(phone)) {
+      showToast('Please enter a valid phone number.', true);
+      if (updateBtn) { updateBtn.disabled = false; updateBtn.textContent = 'Update Profile'; }
+      return;
+    }
+
     const updates = {
       user_id: user.id,
       full_name: fullName || null,
       date_of_birth: dob || null,
       gender: genderInput.value || null,
-      phone: (formData.get('phone') as string) || null,
-      skill_level: (formData.get('skill_level') as string) || null,
-      bio: (formData.get('bio') as string) || null,
-      medical_conditions: (formData.get('medical_conditions') as string) || null,
-      emergency_contact_name: (formData.get('emergency_contact_name') as string) || null,
-      emergency_contact_phone: (formData.get('emergency_contact_phone') as string) || null,
-      member_signature_name: signature,
-      guardian_name: (formData.get('guardian_name') as string) || null,
-      guardian_signature_name: (formData.get('guardian_signature') as string) || null,
-      guardian_email: (formData.get('guardian_email') as string) || null,
-      guardian_phone: (formData.get('guardian_phone') as string) || null,
+      phone: phone,
+      skill_level: getClean('skill_level'),
+      bio: getClean('bio'),
+      medical_conditions: getClean('medical_conditions'),
+      emergency_contact_name: getClean('emergency_contact_name'),
+      emergency_contact_phone: getClean('emergency_contact_phone'),
+      guardian_name: getClean('guardian_name'),
+      guardian_signature_name: getClean('guardian_signature'),
+      guardian_email: getClean('guardian_email')?.toLowerCase(),
+      guardian_phone: getClean('guardian_phone'),
       updated_at: new Date().toISOString(),
     };
 
