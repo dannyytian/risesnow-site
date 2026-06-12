@@ -1,0 +1,117 @@
+---
+import MainLayout from '../../layouts/MainLayout.astro';
+import { getSupabaseClient } from '../../lib/supabase';
+
+const { id } = Astro.params;
+const supabase = getSupabaseClient(Astro.cookies);
+
+// 1. 获取教练详情
+const { data: coach, error } = await supabase
+  .from('coaches')
+  .select('*')
+  .eq('id', id)
+  .single();
+
+// 2. 如果找不到教练，重定向回列表
+if (error || !coach) {
+  return Astro.redirect('/coaches');
+}
+
+const displayImage = coach.image_url || 
+  (coach.gender === 'Female' ? '/images/coaches/default-female.webp' : '/images/coaches/default-male.webp');
+---
+
+<MainLayout title={`${coach.name} - RiseSnow Club`}>
+  <main class="pt-32 pb-24 px-8 max-w-5xl mx-auto">
+    <!-- 返回按钮 -->
+    <a href="/coaches" class="inline-flex items-center text-slate-400 hover:text-brand-blue transition-colors text-[10px] uppercase tracking-[0.2em] mb-12 font-bold group">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+      </svg>
+      Back to Coaches / 返回教练列表
+    </a>
+
+    <article>
+      <header class="border-b border-platinum pb-8 mb-12">
+        <div class="flex items-center space-x-4 mb-4">
+          <span class="text-[10px] px-3 py-1 rounded-sm border border-brand-blue bg-brand-blue text-white uppercase tracking-widest font-bold">
+            Pro Instructor / 职业教练
+          </span>
+          <span class="text-brand-blue/80 text-[10px] tracking-widest font-mono font-bold uppercase italic">{coach.experience} Experience</span>
+        </div>
+        
+        <h1 class="font-serif text-5xl md:text-6xl font-bold uppercase tracking-tight text-slate-900 leading-[1.1] mb-4">
+          {coach.name}
+        </h1>
+        <p class="text-brand-blue/50 text-xs tracking-[0.3em] uppercase">Coach Profile / 教练详情</p>
+      </header>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-16">
+        {/* 左侧详情内容 */}
+        <div class="lg:col-span-2">
+          <div class="aspect-[3/4] w-full bg-slate-100 overflow-hidden shadow-2xl mb-12">
+            <img 
+              src={displayImage} 
+              alt={coach.name}
+              class="w-full h-full object-cover"
+            />
+          </div>
+
+          <section class="prose prose-slate max-w-none prose-headings:font-serif prose-headings:font-bold prose-headings:text-slate-900">
+            <h2 class="font-serif text-2xl font-bold text-slate-900 uppercase tracking-wide mb-6 border-b border-platinum pb-4 italic">About / 个人简介</h2>
+            <div class="text-slate-600 leading-relaxed text-lg whitespace-pre-line italic">
+              "{coach.bio}"
+            </div>
+          </section>
+        </div>
+
+        {/* 右侧边栏卡片 */}
+        <div class="lg:col-span-1">
+          <div class="sticky top-32 bg-white border border-platinum p-8 shadow-sm">
+            <h3 class="font-serif text-lg font-bold text-slate-900 uppercase tracking-widest mb-8 border-b border-platinum pb-4">Specialties</h3>
+            
+            <div class="space-y-8 mb-12">
+              <div class="flex flex-col">
+                <span class="text-slate-400 text-[10px] font-bold uppercase tracking-[0.1em] mb-3 italic">Expertise / 教学领域</span>
+                <div class="flex flex-wrap gap-2">
+                  {(coach.specialty || 'All Mountain').split(',').map((tag: string) => (
+                    <span class="text-[10px] px-2 py-1 bg-slate-50 border border-platinum text-slate-900 font-bold uppercase tracking-wider">
+                      {tag.trim()}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div class="flex flex-col">
+                <span class="text-slate-400 text-[10px] font-bold uppercase tracking-[0.1em] mb-1 italic">Experience / 资历</span>
+                <span class="text-slate-900 font-bold text-lg">{coach.experience || 'Professional'}</span>
+              </div>
+
+              <div class="flex flex-col">
+                <span class="text-slate-400 text-[10px] font-bold uppercase tracking-[0.1em] mb-1 italic">Certification / 认证资格</span>
+                <span class="text-slate-900 font-bold text-lg">CASI/CSIA Certified</span>
+              </div>
+            </div>
+
+            <div class="pt-8 border-t border-platinum">
+              <h4 class="font-serif text-sm font-bold text-slate-900 uppercase tracking-widest mb-4">Book a Session</h4>
+              <p class="text-[11px] text-slate-500 leading-relaxed mb-6">
+                想跟随 {coach.name} 提升滑雪技术？点击下方按钮咨询预约私教课程。
+              </p>
+              <a 
+                href="mailto:info@risesnow.club" 
+                class="block w-full py-4 bg-slate-900 text-white text-center text-[11px] uppercase tracking-[0.3em] font-bold hover:bg-accent-yellow hover:text-slate-900 transition-all duration-500 rounded-sm shadow-2xl shadow-slate-300/50 transform hover:-translate-y-1"
+              >
+                Contact to Book / 预约咨询
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  </main>
+</MainLayout>
+
+<style>
+  .prose p { margin-bottom: 1.5rem; }
+</style>
