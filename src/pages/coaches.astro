@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 const { data: coaches, error } = await supabase
   .from('coaches')
   .select('*')
+  .eq('status', 'active')
   .order('name', { ascending: true });
 ---
 
@@ -14,15 +15,21 @@ const { data: coaches, error } = await supabase
   <main class="pt-32 px-8 max-w-7xl mx-auto">
     <h2 class="font-serif text-4xl uppercase tracking-widest border-b border-platinum pb-4 mb-12">Our Elite Coaches</h2>
     <div class="columns-1 sm:columns-2 lg:columns-3 gap-8">
-      {coaches?.map(coach => (
-        <CoachCard 
-          name={coach.name}
-          specialty={coach.specialty}
-          bio={coach.bio}
-          image={coach.image_url}
-          experience={coach.experience}
-        />
-      ))}
+      {coaches?.map(coach => {
+        // 确定显示的图片：如果 image_url 为空，则根据性别选择对应的默认 WebP 图片
+        const displayImage = coach.image_url || 
+          (coach.gender === 'Female' ? '/images/coaches/default-female.webp' : '/images/coaches/default-male.webp');
+
+        return (
+          <CoachCard 
+            name={coach.name}
+            specialty={coach.specialty}
+            bio={coach.bio}
+            image={displayImage}
+            experience={coach.experience}
+          />
+        );
+      })}
     </div>
   </main>
 </MainLayout>

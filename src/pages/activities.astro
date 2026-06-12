@@ -3,7 +3,8 @@ import MainLayout from '../layouts/MainLayout.astro';
 import { getSupabaseClient } from '../lib/supabase';
 
 const supabase = getSupabaseClient(Astro.cookies);
-const { data: { user } } = await supabase.auth.getUser();
+// 直接从 Middleware 获取解析好的 user，避免重复触发 Auth 刷新逻辑
+const user = Astro.locals.user;
 
 const { data: activities, error } = await supabase
   .from('activities')
@@ -30,22 +31,62 @@ if (user) {
       {activities?.map((activity) => {
         const isRegistered = userRegistrations.includes(activity.id);
         return (
-          <div class="group border border-platinum p-6 hover:border-accent-yellow transition-colors duration-300 bg-white shadow-sm">
-            <div class="flex justify-between items-start mb-4">
-              <h3 class="font-serif text-2xl uppercase tracking-tight">{activity.title}</h3>
+          <div class="group border border-platinum p-6 hover:border-accent-yellow transition-colors duration-300 bg-white shadow-sm flex flex-col h-full">
+            <div class="flex justify-between items-start mb-2">
+              <span class={`text-[10px] px-2 py-0.5 rounded-full border uppercase tracking-wider ${
+                activity.type === 'competition' 
+                ? 'bg-red-50 text-red-600 border-red-100' 
+                : 'bg-blue-50 text-blue-600 border-blue-100'
+              }`}>
+                {activity.type === 'competition' ? 'Competition / 比赛' : 'Training / 训练'}
+              </span>
               <span class="text-brand-blue/60 text-xs tracking-widest uppercase">{activity.date}</span>
             </div>
-            <p class="text-brand-black/70 font-light mb-6 leading-relaxed">{activity.description}</p>
-            <button
-              class={`register-btn text-[10px] uppercase tracking-[0.2em] border-b pb-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                isRegistered ? 'border-gray-300 text-gray-400 cursor-default' : 'border-accent-yellow text-accent-yellow hover:text-accent-yellow cursor-pointer'
-              }`}
-              data-id={activity.id}
-              data-title={activity.title}
-              disabled={isRegistered}
-            >
-              {isRegistered ? 'Already Registered / 已报名' : 'Register Interest / 报名'}
-            </button>
+
+            <h3 class="font-serif text-2xl uppercase tracking-tight mb-4 group-hover:text-accent-yellow transition-colors">
+              {activity.title}
+            </h3>
+            
+            <p class="text-brand-black/70 font-light mb-6 leading-relaxed flex-grow line-clamp-3">
+              {activity.description}
+            </p>
+
+            <div class="space-y-2 mb-8 text-sm border-t border-platinum pt-4">
+              <div class="flex items-center text-brand-black/60">
+                <span class="w-20 font-medium">Price:</span>
+                <span class="text-brand-black font-semibold">
+                  {activity.price && activity.price > 0 ? `¥${activity.price}` : 'Free / 免费'}
+                </span>
+              </div>
+              <div class="flex items-center text-brand-black/60">
+                <span class="w-20 font-medium">Location:</span>
+                <span class="text-brand-black">{activity.location || 'TBD'}</span>
+              </div>
+              <div class="flex items-center text-brand-black/60">
+                <span class="w-20 font-medium">Level:</span>
+                <span class="text-brand-black">{activity.difficulty || 'All Levels'}</span>
+              </div>
+            </div>
+
+            <div class="mt-auto flex items-center justify-between pt-6 border-t border-platinum">
+              <a 
+                href={`/activities/${activity.id}`}
+                class="text-[10px] uppercase tracking-[0.2em] text-brand-black/40 hover:text-accent-yellow transition-colors border-b border-transparent hover:border-accent-yellow pb-1"
+              >
+                Details / 详情
+              </a>
+
+              <button
+                class={`register-btn text-[10px] uppercase tracking-[0.2em] border-b pb-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isRegistered ? 'border-gray-300 text-gray-400 cursor-default' : 'border-accent-yellow text-accent-yellow hover:text-accent-yellow cursor-pointer'
+                }`}
+                data-id={activity.id}
+                data-title={activity.title}
+                disabled={isRegistered}
+              >
+                {isRegistered ? 'Registered / 已报名' : 'Register / 报名'}
+              </button>
+            </div>
           </div>
         );
       })}

@@ -1,8 +1,9 @@
 ---
 import MainLayout from '../layouts/MainLayout.astro';
 import { getSupabaseClient } from '../lib/supabase';
-// 假设你已经将类型提取到了统一文件中
-import type { Profile, RegistrationWithActivity } from '../types/database';
+// types are defined locally because the shared types file is not available here
+type Profile = any;
+type RegistrationWithActivity = any;
 
 const supabase = getSupabaseClient(Astro.cookies);
 // 从 Middleware 获取 user 和 session
@@ -43,19 +44,25 @@ if (!profile || (profileError && profileError.code === 'PGRST116')) {
 }
 
 // 获取该用户已报名的活动列表及活动详情
-const { data: registrationsData } = await supabase
+const { data: registrationsData, error: regError } = await supabase
   .from('registrations')
   .select(`
     id,
     status,
-    activities (
+    activity:activities!inner (
       title,
       date,
-      location
+      location,
+      is_published
     )
   `)
   .eq('user_id', user.id)
+  .eq('activity.is_published', true)
   .order('created_at', { ascending: false });
+
+if (regError) {
+  console.error('Error fetching registrations:', regError);
+}
 
 const myRegistrations = registrationsData as unknown as RegistrationWithActivity[] | null;
 
@@ -82,9 +89,19 @@ const isMinor = (calculatedAge ?? 0) < 18;
 <MainLayout title="Profile Settings - RiseSnow Club">
   <main class="min-h-screen pt-32 px-8 flex justify-center bg-snow-white font-sans">
     <div class="w-full max-w-md">
-      <h2 class="font-serif text-3xl uppercase tracking-widest text-brand-black mb-8 border-b border-platinum pb-4">Welcome, {displayName}</h2>
+      <h2 class="font-serif text-3xl uppercase tracking-widest text-brand-black mb-12 border-b border-platinum pb-4">Welcome, {displayName}</h2>
       
-      <form id="profile-form" class="space-y-6" data-expected-name={displayName}>
+      <!-- 个人档案折叠部分 -->
+      <div class="mb-12">
+        <button id="btn-toggle-profile" class="w-full flex justify-between items-center pb-4 border-b border-platinum group cursor-pointer outline-none">
+          <span class="font-serif text-xl uppercase tracking-widest text-brand-black/60 group-hover:text-brand-black transition-colors">Personal Profile / 个人档案</span>
+          <svg id="icon-profile" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-platinum group-hover:text-brand-black transition-all duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        
+        <!-- 默认隐藏，添加隐藏类 -->
+        <form id="profile-form" class="space-y-6 mt-8 hidden" data-expected-name={displayName}>
         <div>
           <label class="block text-xs uppercase tracking-[0.2em] font-semibold text-brand-black/60 mb-2">Email (Static)</label>
           <input type="text" value={user.email} disabled class="w-full px-4 py-3 bg-platinum/30 border border-platinum text-brand-black/50 rounded-md cursor-not-allowed" />
@@ -254,17 +271,25 @@ const isMinor = (calculatedAge ?? 0) < 18;
           Update Profile
         </button>
       </form>
+      </div>
 
-      <!-- 已报名活动列表 -->
-      <div class="mt-20">
-        <h2 class="font-serif text-3xl uppercase tracking-widest text-brand-black mb-8 border-b border-platinum pb-4">My Activities / 我的报名</h2>
-        <div class="space-y-4">
+      <!-- 我的报名折叠部分 -->
+      <div class="mt-12 mb-20">
+        <button id="btn-toggle-activities" class="w-full flex justify-between items-center pb-4 border-b border-platinum group cursor-pointer outline-none">
+          <span class="font-serif text-xl uppercase tracking-widest text-brand-black/60 group-hover:text-brand-black transition-colors">My Activities / 我的报名</span>
+          <svg id="icon-activities" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-platinum group-hover:text-brand-black transition-all duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        <!-- 默认隐藏 -->
+        <div id="activities-list" class="space-y-4 mt-8 hidden">
           {myRegistrations && myRegistrations.length > 0 ? (
             myRegistrations.map((reg) => (
               <div class="bg-white border border-platinum p-6 rounded-lg shadow-sm flex justify-between items-center group hover:border-brand-blue transition-colors duration-300">
                 <div>
-                  <h3 class="font-serif text-xl text-brand-blue uppercase tracking-tight group-hover:text-brand-blue transition-colors">{reg.activities?.title || '未知活动'}</h3>
-                  <p class="text-sm text-brand-blue/60 mt-1">{reg.activities?.date || 'N/A'} · {reg.activities?.location || 'N/A'}</p>
+                  <h3 class="font-serif text-xl text-brand-blue uppercase tracking-tight group-hover:text-brand-blue transition-colors">{reg.activity?.title || '未知活动'}</h3>
+                  <p class="text-sm text-brand-blue/60 mt-1">{reg.activity?.date || 'N/A'} · {reg.activity?.location || 'N/A'}</p>
                 </div>
                 <div class="text-right flex items-center space-x-6">
                   <span class={`text-[10px] uppercase tracking-widest px-4 py-1.5 rounded-full font-bold shadow-sm ${
@@ -272,12 +297,14 @@ const isMinor = (calculatedAge ?? 0) < 18;
                   }`}>
                     {reg.status === 'pending' ? 'Pending / 审核中' : reg.status}
                   </span>
-                  <button
-                    class="cancel-reg-btn text-[10px] uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors font-bold cursor-pointer"
-                    data-id={reg.id}
-                  >
-                    Cancel / 取消
-                  </button>
+                  {reg.status !== 'confirmed' && (
+                    <button
+                      class="cancel-reg-btn text-[10px] uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors font-bold cursor-pointer"
+                      data-id={reg.id}
+                    >
+                      Cancel / 取消
+                    </button>
+                  )}
                 </div>
               </div>
             ))
@@ -313,6 +340,31 @@ const isMinor = (calculatedAge ?? 0) < 18;
   const toastMessage = document.getElementById('toast-message') as HTMLElement | null;
   const iconSuccess = document.getElementById('toast-icon-success') as HTMLElement | null;
   const iconError = document.getElementById('toast-icon-error') as HTMLElement | null;
+
+  // --- 折叠逻辑切换 ---
+  const btnProfile = document.getElementById('btn-toggle-profile');
+  const btnActivities = document.getElementById('btn-toggle-activities');
+  const iconProfile = document.getElementById('icon-profile');
+  const iconActivities = document.getElementById('icon-activities');
+  const activitiesList = document.getElementById('activities-list');
+
+  function setupToggle(btn: HTMLElement | null, content: HTMLElement | null, icon: HTMLElement | null) {
+    if (!btn || !content || !icon) return;
+    btn.addEventListener('click', () => {
+      const isHidden = content.classList.contains('hidden');
+      if (isHidden) {
+        content.classList.remove('hidden');
+        icon.classList.add('rotate-180');
+      } else {
+        content.classList.add('hidden');
+        icon.classList.remove('rotate-180');
+      }
+    });
+  }
+
+  setupToggle(btnProfile, form, iconProfile);
+  setupToggle(btnActivities, activitiesList, iconActivities);
+  // ------------------
 
   // 2. 辅助函数
   function showToast(message: string, isError = false) {

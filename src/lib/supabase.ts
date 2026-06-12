@@ -38,14 +38,18 @@ export const getSupabaseClient = (cookies: AstroCookies) => {
       storage: {
         getItem: (key: string) => cookies.get(key)?.value ?? null, // 这里是正确的，因为 Astro.cookies.get 返回 { value: string } | undefined
         setItem: (key: string, value: string) => {
+          // 核心优化：如果 Cookie 中已存在相同的值，则不重复调用 set。
+          // 这能极大减少在 Astro 流式渲染启动后抛出的 "headers already sent" 警告。
+          if (cookies.get(key)?.value === value) return;
+
           // 如果响应头已经发送，跳过设置。Astro SSR 的流式渲染常导致此问题。
           // 这是一个安全卫体。
           // 在 Astro SSR 中，Astro.cookies.set 应该在响应头发送前完成。
-          // 如果这里被调用，说明时机不对，但我们不应该阻止它，而是让 Astro 警告。
+          // 我们通过 try-catch 捕获异常，只有在数据真正变化时才尝试写入。
           try {
             cookies.set(key, value, {
               path: '/',
-              secure: true,      // Supabase Auth 建议始终开启
+              secure: import.meta.env.PROD, // 关键修复：仅在生产环境开启。开发环境（非HTTPS）下手机访问必须为 false。
               sameSite: 'lax',
               httpOnly: false,
               maxAge: 604800,    // 显式设置 7 天 (秒)

@@ -11,8 +11,13 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   // 2. 注入 locals。getSession 会从本地缓存获取刚才 getUser 拿到的 session
   locals.user = user ?? null;
-  const { data: { session } } = await supabase.auth.getSession();
-  locals.session = session ?? null;
+  
+  if (user) {
+    const { data: { session } } = await supabase.auth.getSession();
+    locals.session = session ?? null;
+  } else {
+    locals.session = null;
+  }
 
   // 如果用户未登录，且访问的是受保护的路由，则重定向到登录页
   const protectedRoutes = ['/profile', '/activities']; 

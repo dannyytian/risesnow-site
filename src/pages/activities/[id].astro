@@ -1,0 +1,129 @@
+---
+import MainLayout from '../../layouts/MainLayout.astro';
+import { getSupabaseClient } from '../../lib/supabase';
+
+const { id } = Astro.params;
+const supabase = getSupabaseClient(Astro.cookies);
+
+// 1. 获取活动详情
+const { data: activity, error } = await supabase
+  .from('activities')
+  .select('*')
+  .eq('id', id)
+  .single();
+
+// 2. 如果找不到活动，重定向回列表
+if (error || !activity) {
+  return Astro.redirect('/activities');
+}
+
+// 3. 检查当前用户是否已报名
+const user = Astro.locals.user; // 确保这里使用的是 middleware 注入的 locals
+
+let registrationStatus: string | null = null;
+if (user) {
+  const { data: reg } = await supabase
+    .from('registrations')
+    .select('status')
+    .eq('user_id', user.id)
+    .eq('activity_id', id)
+    .maybeSingle();
+  registrationStatus = reg?.status || null;
+}
+---
+
+<MainLayout title={`${activity.title} - RiseSnow Club`}>
+  <main class="pt-32 px-8 max-w-4xl mx-auto pb-20">
+    <!-- 返回按钮 -->
+    <a href="/activities" class="inline-flex items-center text-[10px] uppercase tracking-widest text-brand-black/40 hover:text-accent-yellow transition-colors mb-12">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+      </svg>
+      Back to Activities
+    </a>
+
+    <article>
+      <div class="flex flex-col md:flex-row justify-between items-start gap-4 mb-8">
+        <div>
+          <span class={`text-[10px] px-3 py-1 rounded-full border uppercase tracking-wider mb-4 inline-block ${
+            activity.type === 'competition' 
+            ? 'bg-red-50 text-red-600 border-red-100' 
+            : 'bg-blue-50 text-blue-600 border-blue-100'
+          }`}>
+            {activity.type === 'competition' ? 'Competition / 比赛' : 'Training / 训练'}
+          </span>
+          <h1 class="font-serif text-4xl md:text-5xl uppercase tracking-tight text-brand-black">{activity.title}</h1>
+        </div>
+      </div>
+
+      <!-- 详情网格 -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-8 py-8 border-y border-platinum mb-12">
+        <div>
+          <h4 class="text-[10px] uppercase tracking-[0.2em] text-brand-black/40 mb-2">Date / 日期</h4>
+          <p class="text-brand-black font-medium">{activity.date}</p>
+        </div>
+        <div>
+          <h4 class="text-[10px] uppercase tracking-[0.2em] text-brand-black/40 mb-2">Price / 价格</h4>
+          <p class="text-brand-black font-medium">{activity.price && activity.price > 0 ? `¥${activity.price}` : 'Free / 免费'}</p>
+        </div>
+        <div>
+          <h4 class="text-[10px] uppercase tracking-[0.2em] text-brand-black/40 mb-2">Location / 地点</h4>
+          <p class="text-brand-black font-medium">{activity.location || 'TBD'}</p>
+        </div>
+        <div>
+          <h4 class="text-[10px] uppercase tracking-[0.2em] text-brand-black/40 mb-2">Difficulty / 难度</h4>
+          <p class="text-brand-black font-medium">{activity.difficulty || 'All Levels'}</p>
+        </div>
+        <div>
+          <h4 class="text-[10px] uppercase tracking-[0.2em] text-brand-black/40 mb-2">Status / 状态</h4>
+          <p class="text-brand-black font-medium">
+            {registrationStatus === 'pending' ? 'Pending / 待审核' : 
+             registrationStatus === 'confirmed' ? 'Confirmed / 已确认' : 
+             registrationStatus === 'cancelled' ? 'Cancelled / 已取消' :
+             registrationStatus ? registrationStatus : 'Open / 开放中'}
+          </p>
+        </div>
+      </div>
+
+      <!-- 图片展示 (如果有) -->
+      {activity.image_url && (
+        <div class="mb-12 aspect-video overflow-hidden bg-platinum">
+          <img src={activity.image_url} alt={activity.title} class="w-full h-full object-cover" />
+        </div>
+      )}
+
+      <!-- 活动描述 -->
+      <div class="prose prose-brand max-w-none mb-16">
+        <h3 class="text-xs uppercase tracking-[0.2em] font-bold text-brand-black mb-6">About this activity / 活动介绍</h3>
+        <p class="text-brand-black/80 leading-relaxed whitespace-pre-wrap text-lg font-light">
+          {activity.description}
+        </p>
+      </div>
+
+      <!-- 底部操作栏 -->
+      <div class="bg-white border border-platinum p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
+        <div>
+          <p class="text-xs uppercase tracking-widest text-brand-black/40 mb-1">Ready to join?</p>
+          <p class="font-serif text-xl">Secure your spot for this {activity.type}.</p>
+        </div>
+        
+        {registrationStatus ? (
+          <button disabled class="bg-platinum text-brand-black/40 px-12 py-4 uppercase tracking-[0.2em] font-bold text-xs cursor-not-allowed">
+            {registrationStatus === 'pending' ? 'Pending Approval / 审核中' : 'Already Registered / 已报名'}
+          </button>
+        ) : (
+          <a 
+            href="/activities" 
+            class="bg-brand-black text-snow-white px-12 py-4 uppercase tracking-[0.2em] font-bold text-xs hover:bg-gold-accent transition-colors"
+          >
+            Go to Register / 前往报名
+          </a>
+        )}
+      </div>
+    </article>
+  </main>
+</MainLayout>
+
+<style>
+  .prose p { margin-bottom: 1.5rem; }
+</style>
